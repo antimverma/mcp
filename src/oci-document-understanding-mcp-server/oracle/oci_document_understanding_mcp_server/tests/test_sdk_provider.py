@@ -17,6 +17,7 @@ from oracle.oci_document_understanding_mcp_server.models import (
     ExtractionRequest,
 )
 from oracle.oci_document_understanding_mcp_server.oci.config import OciDocumentUnderstandingConfig
+from oracle.oci_document_understanding_mcp_server.oci import sdk_provider
 from oracle.oci_document_understanding_mcp_server.oci.sdk_provider import OciSdkDocumentUnderstandingProvider
 
 
@@ -91,6 +92,11 @@ def _install_fake_oci(monkeypatch: pytest.MonkeyPatch, token_file: str) -> None:
         ),
     )
     monkeypatch.setitem(sys.modules, "oci", fake_oci)
+    monkeypatch.setattr(
+        sdk_provider,
+        "build_auth_context",
+        lambda _options: SimpleNamespace(config={"region": "us-phoenix-1"}, signer=object()),
+    )
 
 
 def _config(auth_mode: str, *, endpoint: str | None = None, compartment: str | None = "ocid1.compartment.oc1..example") -> OciDocumentUnderstandingConfig:
@@ -105,20 +111,84 @@ def _config(auth_mode: str, *, endpoint: str | None = None, compartment: str | N
     )
 
 
-@pytest.mark.parametrize("auth_mode", ["session-token", "api-key", "instance-principal"])
-def test_sdk_provider_sets_additional_user_agent_for_auth_paths(
+@pytest.mark.parametrize(
+    ("auth_mode", "auth_config", "expected_region"),
+    [
+        ("session-token", {"region": "eu-frankfurt-1"}, "eu-frankfurt-1"),
+        ("api-key", {"region": "eu-frankfurt-1"}, "eu-frankfurt-1"),
+        ("instance-principal", {"region": "uk-london-1"}, "uk-london-1"),
+    ],
+)
+def test_sdk_provider_uses_shared_auth_and_sets_user_agent_for_auth_paths(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path,
     auth_mode: str,
+    auth_config: dict,
+    expected_region: str,
 ) -> None:
     token_file = tmp_path / "token"
     token_file.write_text("token", encoding="utf-8")
     _install_fake_oci(monkeypatch, str(token_file))
+    signer = object()
+    options_seen = []
+
+    def fake_build_auth_context(options):
+        options_seen.append(options)
+        return SimpleNamespace(config=auth_config, signer=signer)
+
+    monkeypatch.setattr(sdk_provider, "build_auth_context", fake_build_auth_context)
 
     provider = OciSdkDocumentUnderstandingProvider(_config(auth_mode, endpoint="https://documents.example.com"))
 
     assert provider.client.base_client.endpoint == "https://documents.example.com"
     assert FakeClient.created[-1][0]["additional_user_agent"] == "oci-document-understanding-mcp/0.1.0"
+    assert FakeClient.created[-1][0]["region"] == expected_region
+    assert FakeClient.created[-1][1] is signer
+    assert options_seen[-1].auth_type == auth_mode
+    assert options_seen[-1].region is None
+
+
+def test_sdk_provider_uses_server_region_only_when_common_auth_has_none(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    token_file = tmp_path / "token"
+    token_file.write_text("token", encoding="utf-8")
+    _install_fake_oci(monkeypatch, str(token_file))
+    monkeypatch.setattr(
+        sdk_provider,
+        "build_auth_context",
+        lambda _options: SimpleNamespace(config={}, signer=object()),
+    )
+
+    OciSdkDocumentUnderstandingProvider(_config("instance-principal"))
+
+    assert FakeClient.created[-1][0]["region"] == "us-phoenix-1"
+
+
+def test_sdk_provider_removes_confidence_when_requested(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    token_file = tmp_path / "token"
+    token_file.write_text("token", encoding="utf-8")
+    _install_fake_oci(monkeypatch, str(token_file))
+    monkeypatch.setattr(
+        sdk_provider,
+        "build_auth_context",
+        lambda _options: SimpleNamespace(config={"region": "us-phoenix-1"}, signer=object()),
+    )
+    FakeClient.responses.append(
+        SimpleNamespace(
+            data=FakeData({"keyValues": [{"key": "invoice", "confidence": 0.98, "nested": {"confidence": 0.9}}]}),
+            headers={"opc-request-id": "extract-request"},
+        )
+    )
+    provider = OciSdkDocumentUnderstandingProvider(_config("api-key"))
+
+    result = provider.extract(
+        ExtractionRequest(
+            document_source=DocumentSource(source_type="INLINE_BASE64", document="SGVsbG8=", mime_type="application/pdf"),
+            features=["KEY_VALUE"],
+            options=ExtractionOptions(language=None, include_confidence=False),
+        )
+    )
+
+    assert result.payload["keyValues"] == [{"key": "invoice", "nested": {}}]
 
 
 def test_sdk_provider_requires_compartment_before_building_request(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:

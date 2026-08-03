@@ -34,7 +34,7 @@ class ExtractionOptions(FrozenModel):
     """Options accepted by the document_extract tool."""
 
     language: str | None = Field(None, description="Optional document language code.")
-    include_confidence: bool = Field(True, description="Whether confidence scores should be included in extraction metadata.")
+    include_confidence: bool = Field(True, description="Whether confidence scores should be included in extraction results.")
 
 
 class ExtractionRequest(FrozenModel):

@@ -75,6 +75,11 @@ matching session `key_file`.
 | `OCI_CONFIG_FILE` | No | OCI SDK default | OCI config file path. |
 | `OCI_DOCUMENT_ENDPOINT` | No | None | Optional Document Understanding endpoint override. |
 
+`OCI_REGION`, when set, takes precedence over the region in an OCI config
+profile. Otherwise, profile authentication uses the profile region and
+principal authentication uses the signer region, with `us-ashburn-1` as the
+server fallback.
+
 ## Tools
 
 | Tool Name | Description |
@@ -97,6 +102,9 @@ Inline base64 input:
   }
 }
 ```
+
+Set `include_confidence` to `false` to omit confidence fields from extraction
+results.
 
 Object Storage input:
 

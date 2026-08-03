@@ -64,6 +64,26 @@ def test_fastmcp_call_tool_preserves_success_response_shape(monkeypatch) -> None
     assert result.structured_content["data"]["metadata"]["requestConfigs"][0]["parameters"]["languageCode"] == "en"
 
 
+def test_fastmcp_extract_omits_confidence_when_requested(monkeypatch) -> None:
+    _reset_server()
+    monkeypatch.setattr(server, "create_provider", lambda config: StubOciDocumentUnderstandingProvider(config))
+    monkeypatch.setattr(server.OciDocumentUnderstandingConfig, "from_environment", staticmethod(_stub_config))
+
+    result = asyncio.run(
+        server.mcp.call_tool(
+            "document_extract",
+            {
+                "document": "SGVsbG8=",
+                "mime_type": "application/pdf",
+                "features": ["KEY_VALUE", "TABLE", "ELEMENT"],
+                "options": {"include_confidence": False},
+            },
+        )
+    )
+
+    assert "confidence" not in str(result.structured_content["data"])
+
+
 def test_direct_tool_functions_preserve_legacy_and_structured_inputs(monkeypatch) -> None:
     _reset_server()
     monkeypatch.setattr(server, "create_provider", lambda config: StubOciDocumentUnderstandingProvider(config))

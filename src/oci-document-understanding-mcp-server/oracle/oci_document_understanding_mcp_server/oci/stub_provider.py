@@ -11,6 +11,7 @@ from uuid import uuid4
 from oracle.oci_document_understanding_mcp_server.models import ClassificationRequest, ExtractionRequest, RawOciDocumentResult
 from oracle.oci_document_understanding_mcp_server.oci.config import OciDocumentUnderstandingConfig
 from oracle.oci_document_understanding_mcp_server.oci.request_mapper import classification_config, extraction_configs
+from oracle.oci_document_understanding_mcp_server.oci.response_filter import without_confidence
 
 
 class StubOciDocumentUnderstandingProvider:
@@ -47,6 +48,8 @@ class StubOciDocumentUnderstandingProvider:
                 {"type": "TITLE", "text": "Invoice", "page": 1, "confidence": 0.99},
                 {"type": "PARAGRAPH", "text": "Sample extracted text from OCI Document Understanding.", "page": 1, "confidence": 0.94},
             ]
+        if not request.options.include_confidence:
+            payload = without_confidence(payload)
         return RawOciDocumentResult(
             request_id=str(uuid4()),
             operation="extract",

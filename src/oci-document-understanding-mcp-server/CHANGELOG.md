@@ -9,6 +9,14 @@
 - Added OCI SDK additional user-agent telemetry for Document Understanding clients.
 - Removed the custom stdio JSON-RPC transport and prototype shell helper scripts from the public package layout.
 
+### Changed
+
+- Use `oracle-mcp-common` for OCI SDK authentication and standard region resolution.
+
+### Fixed
+
+- Honor `include_confidence=false` by omitting confidence values from extraction results.
+
 ## 0.1.0
 
 ### Added

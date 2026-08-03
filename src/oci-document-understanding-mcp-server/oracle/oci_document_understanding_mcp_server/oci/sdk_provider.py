@@ -7,10 +7,13 @@ https://oss.oracle.com/licenses/upl.
 from datetime import datetime, timezone
 from typing import Any
 
+from oracle_mcp_common import AuthOptions, build_auth_context
+
 from oracle.oci_document_understanding_mcp_server import __project__, __version__
 from oracle.oci_document_understanding_mcp_server.models import ClassificationRequest, DocumentSource, ExtractionRequest, RawOciDocumentResult
 from oracle.oci_document_understanding_mcp_server.oci.config import OciDocumentUnderstandingConfig
 from oracle.oci_document_understanding_mcp_server.oci.request_mapper import classification_config, extraction_configs
+from oracle.oci_document_understanding_mcp_server.oci.response_filter import without_confidence
 
 _user_agent_name = __project__.split("oracle.", 1)[1].split("-server", 1)[0]
 _ADDITIONAL_UA = f"{_user_agent_name}/{__version__}"
@@ -27,6 +30,8 @@ class OciSdkDocumentUnderstandingProvider:
         """Submits an extraction request to OCI Document Understanding."""
         response = self._analyze_document(request, operation="extract", feature_types=request.features)
         payload = self._response_to_payload(response)
+        if not request.options.include_confidence:
+            payload = without_confidence(payload)
         payload.setdefault("provider", "oci-sdk")
         payload.setdefault("requestConfigs", extraction_configs(request, self.config))
         return RawOciDocumentResult(
@@ -56,30 +61,18 @@ class OciSdkDocumentUnderstandingProvider:
         except ImportError as exc:
             raise RuntimeError("oci Python SDK is required for local/prod modes. Install with: pip install -e .") from exc
 
-        if self.config.auth_mode == "instance-principal":
-            signer = oci.auth.signers.InstancePrincipalsSecurityTokenSigner()
-            client_config = {
-                "region": self.config.region,
-                "additional_user_agent": _ADDITIONAL_UA,
-            }
-            client = oci.ai_document.AIServiceDocumentClient(client_config, signer=signer)
-        elif self.config.auth_mode == "session-token":
-            client_config = oci.config.from_file(self.config.config_file_path or oci.config.DEFAULT_LOCATION, self.config.profile)
-            client_config["additional_user_agent"] = _ADDITIONAL_UA
-            token_file = client_config.get("security_token_file")
-            if not token_file:
-                raise RuntimeError("session-token auth requires security_token_file in the OCI config profile")
-            with open(token_file, encoding="utf-8") as token:
-                security_token = token.read()
-            private_key = oci.signer.load_private_key_from_file(client_config["key_file"])
-            signer = oci.auth.signers.SecurityTokenSigner(security_token, private_key)
-            client = oci.ai_document.AIServiceDocumentClient(client_config, signer=signer)
-        elif self.config.auth_mode == "api-key":
-            client_config = oci.config.from_file(self.config.config_file_path or oci.config.DEFAULT_LOCATION, self.config.profile)
-            client_config["additional_user_agent"] = _ADDITIONAL_UA
-            client = oci.ai_document.AIServiceDocumentClient(client_config)
-        else:
-            raise RuntimeError(f"Unsupported OCI auth mode for SDK provider: {self.config.auth_mode}")
+        auth_context = build_auth_context(
+            AuthOptions(
+                auth_type=self.config.auth_mode,
+                config_file=self.config.config_file_path,
+                profile_name=self.config.profile,
+            )
+        )
+        client_config = {**auth_context.config, "additional_user_agent": _ADDITIONAL_UA}
+        # oracle-mcp-common resolves OCI_REGION, then the profile or signer
+        # region. Preserve this server's documented IAD value only as a final fallback.
+        client_config.setdefault("region", self.config.region)
+        client = oci.ai_document.AIServiceDocumentClient(client_config, signer=auth_context.signer)
 
         if self.config.endpoint:
             client.base_client.set_endpoint(self.config.endpoint)

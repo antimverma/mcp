@@ -8,6 +8,12 @@ resolution-markers = [
     "python_full_version < '3.14' and sys_platform != 'win32'",
 ]
 
+[manifest]
+members = [
+    "oracle-mcp-common",
+    "oracle-oci-document-understanding-mcp-server",
+]
+
 [[package]]
 name = "aiofile"
 version = "3.11.1"
@@ -759,12 +765,40 @@ wheels = [
 ]
 
 [[package]]
+name = "oracle-mcp-common"
+version = "0.1.2"
+source = { editable = "../common" }
+dependencies = [
+    { name = "fastmcp" },
+    { name = "oci" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-cov" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastmcp", specifier = ">=3.2.4,<4.0.0" },
+    { name = "oci", specifier = ">=2.179.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest", specifier = ">=9.0.3" },
+    { name = "pytest-cov", specifier = ">=7.0.0" },
+]
+
+[[package]]
 name = "oracle-oci-document-understanding-mcp-server"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastmcp" },
     { name = "oci" },
+    { name = "oracle-mcp-common" },
     { name = "pydantic" },
 ]
 
@@ -778,6 +812,7 @@ dev = [
 requires-dist = [
     { name = "fastmcp", specifier = "==3.4.2" },
     { name = "oci", specifier = "==2.179.0" },
+    { name = "oracle-mcp-common", editable = "../common" },
     { name = "pydantic", specifier = "==2.12.3" },
 ]
 
