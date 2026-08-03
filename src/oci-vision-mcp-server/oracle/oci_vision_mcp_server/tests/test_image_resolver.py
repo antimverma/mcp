@@ -39,7 +39,26 @@ def test_rejects_base64_that_is_not_an_image() -> None:
     data = base64.b64encode(b"plain text, not image bytes").decode("ascii")
     image = ImageInput.model_validate({"source_type": "base64", "data": data})
 
-    with pytest.raises(ImageResolverError, match="supported image type"):
+    with pytest.raises(ImageResolverError, match="JPEG and PNG"):
+        ImageResolver(base_dir=None).resolve(image)
+
+
+@pytest.mark.parametrize("data", [b"GIF89adata", b"BMdata", b"II*\x00data", b"RIFFxxxxWEBPdata"])
+def test_rejects_image_formats_not_supported_by_oci_vision(data: bytes) -> None:
+    image = ImageInput.model_validate(
+        {"source_type": "base64", "data": base64.b64encode(data).decode("ascii")}
+    )
+
+    with pytest.raises(ImageResolverError, match="JPEG and PNG"):
+        ImageResolver(base_dir=None).resolve(image)
+
+
+def test_rejects_images_larger_than_oci_vision_limit() -> None:
+    image = ImageInput.model_validate(
+        {"source_type": "base64", "data": base64.b64encode(PNG_BYTES + b"x" * (5 * 1024 * 1024)).decode("ascii")}
+    )
+
+    with pytest.raises(ImageResolverError, match="MCP_MAX_IMAGE_BYTES"):
         ImageResolver(base_dir=None).resolve(image)
 
 

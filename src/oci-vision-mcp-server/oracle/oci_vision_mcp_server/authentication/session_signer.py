@@ -10,7 +10,7 @@ import os
 import shlex
 from dataclasses import dataclass
 
-import oci
+from oracle_mcp_common import AuthOptions, AuthType, build_auth_context
 
 from .. import __project__, __version__
 from ..config.consts import DEFAULT_SESSION_AUTH_COMMAND, SESSION_AUTH_COMMAND_ENV
@@ -36,35 +36,27 @@ class SessionAuthenticationError(RuntimeError):
 
 
 def session_config(*, profile: str | None = None, region: str | None = None):
-    resolved_config = None if profile and region else get_resolved_config()
+    """Resolve the configured session-token context through oracle-mcp-common."""
+    resolved_config = None if profile else get_resolved_config()
     selected_profile = profile or resolved_config.profile
-    config = oci.config.from_file(profile_name=selected_profile)
-    selected_region = region or resolved_config.region
-    if selected_region:
-        config["region"] = selected_region
-    config["additional_user_agent"] = _ADDITIONAL_UA
-    context = SessionAuthContext(profile=selected_profile, region=config.get("region"))
-
-    security_token_file = config.get("security_token_file")
-    key_file = config.get("key_file")
-    if not security_token_file or not key_file:
-        raise _session_auth_error(
-            context,
-            "OCI config profile is not a session-token profile",
-        )
-
+    selected_region = region or (resolved_config.region if resolved_config else None)
     try:
-        with open(security_token_file, encoding="utf-8") as token_file:
-            token = token_file.read()
-        private_key = oci.signer.load_private_key_from_file(key_file)
-    except OSError as exc:
+        auth_context = build_auth_context(
+            AuthOptions(
+                auth_type=AuthType.SECURITY_TOKEN,
+                profile_name=selected_profile,
+                region=selected_region,
+            )
+        )
+    except ValueError as exc:
+        context = SessionAuthContext(profile=selected_profile, region=selected_region)
         raise _session_auth_error(
             context,
-            f"OCI session material could not be read: {exc}",
+            str(exc),
         ) from exc
-
-    signer = oci.auth.signers.SecurityTokenSigner(token, private_key)
-    return config, signer, context
+    config = {**auth_context.config, "additional_user_agent": _ADDITIONAL_UA}
+    context = SessionAuthContext(profile=selected_profile, region=auth_context.region)
+    return config, auth_context.signer, context
 
 
 def session_auth_command(context: SessionAuthContext) -> str:
@@ -91,7 +83,7 @@ def session_auth_error_from_service_error(
     if not _is_auth_failure(exc):
         return None
 
-    resolved_config = None if profile and region else get_resolved_config()
+    resolved_config = None if profile else get_resolved_config()
     selected_profile = profile or resolved_config.profile
     selected_region = region or resolved_config.region
     context = SessionAuthContext(profile=selected_profile, region=selected_region)

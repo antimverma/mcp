@@ -35,11 +35,11 @@ server requires those session-profile entries and does not support API-key-only
 profiles, instance principals, resource principals, IDCS bearer tokens, or
 OAuth.
 
-Set the profile and region through environment variables:
+The OCI profile defaults to `DEFAULT`; OCI uses the profile region unless
+`OCI_REGION` overrides it. Set a default Vision compartment only when callers
+will not provide `compartment_id` in individual Vision tool calls:
 
 ```sh
-OCI_CONFIG_PROFILE=DEFAULT
-OCI_REGION=us-phoenix-1
 OCI_VISION_DEFAULT_COMPARTMENT_ID=ocid1.compartment.oc1..example
 ```
 
@@ -76,9 +76,10 @@ local interactive use, set `OCI_MCP_AUTO_AUTH=true`.
 | Environment Variable | Required | Default | Description |
 | --- | --- | --- | --- |
 | `OCI_CONFIG_PROFILE` | No | `DEFAULT` | OCI config profile to use. |
+| `OCI_CONFIG_FILE` | No | `~/.oci/config` | OCI configuration file containing the selected session-token profile. |
 | `OCI_REGION` | No | Profile region | OCI region override. |
 | `OCI_VISION_DEFAULT_COMPARTMENT_ID` | Yes for Vision tools unless passed in the tool input | None | Default compartment OCID for Vision requests. |
-| `MCP_IMAGE_BASE_DIR` | No | Current working directory | Base directory used to validate local `file_path` image inputs. |
+| `MCP_IMAGE_BASE_DIR` | No | Current working directory | Base directory used to validate local `file_path` image inputs. Vision analysis accepts JPEG/PNG inputs up to 5 MiB. |
 | `OCI_VISION_RESULT_STORE_DIR` | No | `~/.oci-vision-mcp/results` | Directory for raw OCI result metadata. |
 | `OCI_VISION_LOG_DIR` | No | `~/.oci-vision-mcp/logs` | Directory reserved for MCP diagnostic logs. |
 | `OCI_MCP_AUTO_AUTH` | No | `false` | Opt-in browser-based session authentication. |

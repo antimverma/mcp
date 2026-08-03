@@ -77,13 +77,12 @@ def test_parse_blocks_internal_dns_targets(monkeypatch, address: str) -> None:
 def test_sniff_image_mime_accepts_supported_image_bytes() -> None:
     assert _sniff_image_mime(PNG_BYTES) == "image/png"
     assert _sniff_image_mime(b"\xff\xd8\xffdata") == "image/jpeg"
-    assert _sniff_image_mime(b"GIF89adata") == "image/gif"
-    assert _sniff_image_mime(b"BMdata") == "image/bmp"
-    assert _sniff_image_mime(b"II*\x00data") == "image/tiff"
-    assert _sniff_image_mime(b"RIFFxxxxWEBPdata") == "image/webp"
 
 
-@pytest.mark.parametrize("data", [b"PK\x03\x04zip", b"\x1f\x8bgzip", b"not-an-image"])
+@pytest.mark.parametrize(
+    "data",
+    [b"PK\x03\x04zip", b"\x1f\x8bgzip", b"not-an-image", b"GIF89adata", b"BMdata", b"II*\x00data", b"RIFFxxxxWEBPdata"],
+)
 def test_sniff_image_mime_rejects_non_images(data: bytes) -> None:
     with pytest.raises(UrlImageFetchError):
         _sniff_image_mime(data)

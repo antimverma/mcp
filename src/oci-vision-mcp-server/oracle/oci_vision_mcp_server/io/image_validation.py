@@ -31,11 +31,6 @@ MIME_BY_EXTENSION = {
     ".jpg": "image/jpeg",
     ".jpeg": "image/jpeg",
     ".png": "image/png",
-    ".gif": "image/gif",
-    ".bmp": "image/bmp",
-    ".tif": "image/tiff",
-    ".tiff": "image/tiff",
-    ".webp": "image/webp",
 }
 
 
@@ -46,15 +41,7 @@ def sniff_image_mime(data: bytes) -> str:
         return "image/jpeg"
     if data.startswith(b"\x89PNG\r\n\x1a\n"):
         return "image/png"
-    if data.startswith((b"GIF87a", b"GIF89a")):
-        return "image/gif"
-    if data.startswith(b"BM"):
-        return "image/bmp"
-    if data.startswith((b"II*\x00", b"MM\x00*")):
-        return "image/tiff"
-    if len(data) >= 12 and data.startswith(b"RIFF") and data[8:12] == b"WEBP":
-        return "image/webp"
-    raise ImageValidationError("Image bytes are not a supported image type.")
+    raise ImageValidationError("OCI Vision accepts JPEG and PNG image inputs only.")
 
 
 def _reject_archive_or_container(data: bytes) -> None:

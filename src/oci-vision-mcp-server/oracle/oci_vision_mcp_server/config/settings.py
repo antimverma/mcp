@@ -77,8 +77,8 @@ class EnvVarInfo:
 @dataclass(frozen=True)
 class ResolvedMcpConfig:
     profile: str
-    region: str
-    default_compartment_id: str
+    region: str | None
+    default_compartment_id: str | None
     image_base_dir: str
     max_image_bytes: int
     refresh_session: bool
@@ -142,14 +142,10 @@ class ResolvedMcpConfig:
                 }
                 for key, value in values.items()
             },
-            "required_env_vars": [
-                ENV_PROFILE,
-                ENV_REGION,
-                ENV_DEFAULT_COMPARTMENT_ID,
-            ],
+            "required_env_vars": [],
             "note": (
-                "Required values must be provided as environment variables by the MCP client "
-                "configuration, a runner script, or the launching shell."
+                "OCI_CONFIG_PROFILE defaults to DEFAULT and OCI_REGION defaults to the profile region. "
+                "Vision tools require a compartment_id in the tool call or OCI_VISION_DEFAULT_COMPARTMENT_ID."
             ),
         }
 
@@ -158,23 +154,23 @@ ENV_VAR_CATALOG: tuple[EnvVarInfo, ...] = (
     EnvVarInfo(
         name=ENV_PROFILE,
         purpose="OCI CLI profile used for session-token auth.",
-        required=True,
-        default="none",
+        required=False,
+        default="DEFAULT",
         used_in="config/settings.py, authentication/auth.py, authentication/session_signer.py, oci_clients/vision.py, oci_clients/object_storage.py",
         effect="Selects the OCI profile read from ~/.oci/config.",
     ),
     EnvVarInfo(
         name=ENV_REGION,
-        purpose="OCI region for session authentication and Vision endpoint.",
-        required=True,
-        default="none",
+        purpose="OCI region override for session authentication and Vision endpoint.",
+        required=False,
+        default="profile region",
         used_in="config/settings.py, authentication/auth.py, authentication/session_signer.py, oci_clients/vision.py, oci_clients/object_storage.py",
         effect="Sets the region for session auth and AIServiceVisionClient.",
     ),
     EnvVarInfo(
         name=ENV_DEFAULT_COMPARTMENT_ID,
         purpose="Default compartment OCID for Vision tool calls.",
-        required=True,
+        required=False,
         default="none",
         used_in="config/settings.py, tools/vision_api_tools/runner.py",
         effect="Used when a tool call does not provide compartment_id.",
@@ -376,26 +372,25 @@ def get_resolved_config(
     sources: dict[str, str] = {}
     locked: dict[str, bool] = {}
 
-    profile = _required_env(
-        ENV_PROFILE,
+    # Keep configuration usable for Object Storage and stored-result tools.
+    # Vision validates its compartment at the operation boundary instead.
+    del _allow_missing_required
+    profile = _resolve_string(
         "profile",
-        sources,
-        locked,
-        allow_missing=_allow_missing_required,
+        env_name=ENV_PROFILE,
+        sources=sources,
+        locked=locked,
+        default="DEFAULT",
+        default_source="default",
     )
-    region = _required_env(
-        ENV_REGION,
-        "region",
-        sources,
-        locked,
-        allow_missing=_allow_missing_required,
+    region = _resolve_optional_string(
+        "region", env_name=ENV_REGION, sources=sources, locked=locked
     )
-    default_compartment_id = _required_env(
-        ENV_DEFAULT_COMPARTMENT_ID,
+    default_compartment_id = _resolve_optional_string(
         "default_compartment_id",
-        sources,
-        locked,
-        allow_missing=_allow_missing_required,
+        env_name=ENV_DEFAULT_COMPARTMENT_ID,
+        sources=sources,
+        locked=locked,
     )
     image_base_dir = _resolve_image_base_dir(
         sources=sources,
@@ -410,6 +405,17 @@ def get_resolved_config(
         locked=locked,
         diagnostic_errors=_diagnostic_errors,
     )
+    if max_image_bytes > DEFAULT_MAX_IMAGE_BYTES:
+        message = (
+            f"{ENV_MAX_IMAGE_BYTES} cannot exceed {DEFAULT_MAX_IMAGE_BYTES} bytes, "
+            "the OCI Vision image-analysis limit."
+        )
+        if _diagnostic_errors is None:
+            raise McpConfigurationError(message)
+        _diagnostic_errors.append(_configuration_error(ENV_MAX_IMAGE_BYTES, message))
+        max_image_bytes = DEFAULT_MAX_IMAGE_BYTES
+        sources["max_image_bytes"] = f"default:invalid:{ENV_MAX_IMAGE_BYTES}"
+        locked["max_image_bytes"] = False
     refresh_session = _resolve_bool(
         "refresh_session",
         env_name=ENV_REFRESH_SESSION,
@@ -616,26 +622,12 @@ def get_config_diagnostics() -> dict[str, Any]:
         _allow_missing_required=True,
         _diagnostic_errors=validation_errors,
     )
-    required_env_vars = [ENV_PROFILE, ENV_REGION, ENV_DEFAULT_COMPARTMENT_ID]
-    missing_required_env_vars = [name for name in required_env_vars if _env_value(name) is None]
-    missing_errors = [
-        _configuration_error(
-            name,
-            (
-                f"{name} is required. Set it in your MCP client environment, "
-                "runner script, or launching shell."
-            ),
-            code="MISSING_REQUIRED_ENV_VAR",
-        )
-        for name in missing_required_env_vars
-    ]
-
     status = config.status()
     status.update(
         {
-            "valid": not missing_errors and not validation_errors,
-            "missing_required_env_vars": missing_required_env_vars,
-            "errors": [*missing_errors, *validation_errors],
+            "valid": not validation_errors,
+            "missing_required_env_vars": [],
+            "errors": validation_errors,
         }
     )
     return status
@@ -653,29 +645,6 @@ def env_var_catalog() -> list[dict[str, Any]]:
         }
         for item in ENV_VAR_CATALOG
     ]
-
-
-def _required_env(
-    name: str,
-    field: str,
-    sources: dict[str, str],
-    locked: dict[str, bool],
-    *,
-    allow_missing: bool = False,
-) -> str:
-    value, source = _configured_value(name)
-    if not value:
-        if allow_missing:
-            sources[field] = "missing"
-            locked[field] = False
-            return ""
-        raise McpConfigurationError(
-            f"{name} is required. Set it as an environment variable in your MCP client "
-            "configuration, runner script, or launching shell, then restart the MCP server."
-        )
-    sources[field] = source
-    locked[field] = True
-    return value
 
 
 def _resolve_string(

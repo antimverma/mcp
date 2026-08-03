@@ -29,36 +29,21 @@ def test_required_env_values_are_resolved_and_locked() -> None:
     assert config.locked_fields["default_compartment_id"] is True
 
 
-def test_missing_required_env_raises_clear_error(monkeypatch) -> None:
-    monkeypatch.delenv("OCI_CONFIG_PROFILE", raising=False)
-
-    with pytest.raises(McpConfigurationError) as exc_info:
-        get_resolved_config()
-
-    assert "OCI_CONFIG_PROFILE is required" in str(exc_info.value)
-    assert "environment variable" in str(exc_info.value)
-
-
-def test_config_diagnostics_reports_all_missing_required_values(monkeypatch) -> None:
+def test_optional_connection_and_compartment_values_use_documented_defaults(monkeypatch) -> None:
     for name in ("OCI_CONFIG_PROFILE", "OCI_REGION", "OCI_VISION_DEFAULT_COMPARTMENT_ID"):
         monkeypatch.delenv(name, raising=False)
 
+    config = get_resolved_config()
     status = get_config_diagnostics()
 
-    assert status["valid"] is False
-    assert status["missing_required_env_vars"] == [
-        "OCI_CONFIG_PROFILE",
-        "OCI_REGION",
-        "OCI_VISION_DEFAULT_COMPARTMENT_ID",
-    ]
-    assert [error["code"] for error in status["errors"]] == [
-        "MISSING_REQUIRED_ENV_VAR",
-        "MISSING_REQUIRED_ENV_VAR",
-        "MISSING_REQUIRED_ENV_VAR",
-    ]
+    assert config.profile == "DEFAULT"
+    assert config.region is None
+    assert config.default_compartment_id is None
+    assert status["valid"] is True
+    assert status["missing_required_env_vars"] == []
     assert status["values"]["profile"] == {
-        "value": "",
-        "source": "missing",
+        "value": "DEFAULT",
+        "source": "default",
         "locked": False,
     }
 
@@ -242,6 +227,13 @@ def test_invalid_integer_env_raises_configuration_error(monkeypatch) -> None:
         get_resolved_config()
 
     assert "MCP_MAX_IMAGE_BYTES must be a positive integer" in str(exc_info.value)
+
+
+def test_image_size_override_cannot_exceed_oci_vision_limit(monkeypatch) -> None:
+    monkeypatch.setenv("MCP_MAX_IMAGE_BYTES", str(5 * 1024 * 1024 + 1))
+
+    with pytest.raises(McpConfigurationError, match="OCI Vision image-analysis limit"):
+        get_resolved_config()
 
 
 def test_invalid_boolean_env_raises_configuration_error(monkeypatch) -> None:

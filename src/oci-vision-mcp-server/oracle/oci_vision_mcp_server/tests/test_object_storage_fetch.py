@@ -6,12 +6,68 @@ https://oss.oracle.com/licenses/upl.
 
 from __future__ import annotations
 
+import io
 from types import SimpleNamespace
 
 import oci
+import pytest
 
+from oracle.oci_vision_mcp_server.io.object_storage import (
+    ObjectStorageDownloadError,
+    write_object_response_to_file,
+)
 from oracle.oci_vision_mcp_server.io.result_store import safe_request_key
 from oracle.oci_vision_mcp_server.tools.object_storage_tools import fetch_object_storage_object as fetch_tool
+
+
+def test_download_streaming_limit_cleans_temporary_file_and_preserves_destination(tmp_path) -> None:
+    destination = tmp_path / "download.png"
+    destination.write_bytes(b"existing")
+
+    with pytest.raises(ObjectStorageDownloadError, match="FETCH_MAX_BYTES"):
+        write_object_response_to_file(
+            response=SimpleNamespace(data=io.BytesIO(b"abcdef")),
+            destination=destination,
+            max_bytes=5,
+            overwrite=True,
+        )
+
+    assert destination.read_bytes() == b"existing"
+    assert list(tmp_path.glob(".download.png.*.tmp")) == []
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        b"bytes-body",
+        SimpleNamespace(content=b"content-body"),
+        io.BytesIO(b"read-body"),
+    ],
+)
+def test_download_supports_sdk_response_body_variants(tmp_path, body) -> None:
+    destination = tmp_path / "download.bin"
+
+    written = write_object_response_to_file(
+        response=SimpleNamespace(data=body),
+        destination=destination,
+        max_bytes=100,
+        overwrite=False,
+    )
+
+    assert written == len(destination.read_bytes())
+
+
+def test_download_refuses_existing_destination_without_overwrite(tmp_path) -> None:
+    destination = tmp_path / "download.bin"
+    destination.write_bytes(b"existing")
+
+    with pytest.raises(ObjectStorageDownloadError, match="already exists"):
+        write_object_response_to_file(
+            response=SimpleNamespace(data=b"new"),
+            destination=destination,
+            max_bytes=100,
+            overwrite=False,
+        )
 
 
 def test_fetch_object_storage_object_downloads_under_default_download_dir(monkeypatch, tmp_path) -> None:

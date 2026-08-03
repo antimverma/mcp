@@ -247,12 +247,12 @@ async def test_get_config_status_returns_non_secret_config() -> None:
     assert structured["errors"] == []
     assert structured["configuration_source"] == "process_environment"
     assert "profile" in structured["values"]
-    assert "OCI_CONFIG_PROFILE" in structured["required_env_vars"]
-    assert "environment variables" in structured["note"]
+    assert structured["required_env_vars"] == []
+    assert "OCI_CONFIG_PROFILE defaults to DEFAULT" in structured["note"]
 
 
 @pytest.mark.anyio
-async def test_get_config_status_succeeds_with_missing_required_config(monkeypatch) -> None:
+async def test_get_config_status_succeeds_with_optional_connection_config(monkeypatch) -> None:
     monkeypatch.delenv("OCI_CONFIG_PROFILE", raising=False)
     monkeypatch.delenv("OCI_REGION", raising=False)
     monkeypatch.delenv("OCI_VISION_DEFAULT_COMPARTMENT_ID", raising=False)
@@ -262,14 +262,10 @@ async def test_get_config_status_succeeds_with_missing_required_config(monkeypat
     structured = _fastmcp_structured(result)
 
     assert _fastmcp_is_error(result) is False
-    assert structured["valid"] is False
-    assert structured["missing_required_env_vars"] == [
-        "OCI_CONFIG_PROFILE",
-        "OCI_REGION",
-        "OCI_VISION_DEFAULT_COMPARTMENT_ID",
-    ]
-    assert len(structured["errors"]) == 3
-    assert "profile=not configured" in _fastmcp_text(result)
+    assert structured["valid"] is True
+    assert structured["missing_required_env_vars"] == []
+    assert structured["errors"] == []
+    assert "profile=DEFAULT" in _fastmcp_text(result)
 
 
 def test_run_tool_checks_session_auth_before_oci_call(monkeypatch) -> None:

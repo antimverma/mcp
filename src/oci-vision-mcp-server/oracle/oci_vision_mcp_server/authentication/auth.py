@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import oci
+from oracle_mcp_common import resolve_config_file
 
 from ..config.settings import ResolvedMcpConfig, get_resolved_config
 
@@ -67,7 +68,10 @@ def ensure_session_auth() -> None:
 
 def _load_session_config(resolved_config: ResolvedMcpConfig) -> SessionConfig:
     try:
-        raw_config = oci.config.from_file(profile_name=resolved_config.profile)
+        raw_config = oci.config.from_file(
+            file_location=resolve_config_file(),
+            profile_name=resolved_config.profile,
+        )
     except Exception:
         return SessionConfig(
             profile=resolved_config.profile,

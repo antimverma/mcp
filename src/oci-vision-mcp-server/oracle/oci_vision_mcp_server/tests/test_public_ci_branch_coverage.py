@@ -80,6 +80,34 @@ def test_auth_helpers_cover_invalid_tokens_and_missing_config(monkeypatch, tmp_p
     assert loaded.security_token_file is None
 
 
+def test_session_precheck_honors_oci_config_file(monkeypatch, tmp_path) -> None:
+    custom_config = tmp_path / "oci-config"
+    custom_config.write_text("[VISION_SESSION]\n", encoding="utf-8")
+    monkeypatch.setenv("OCI_CONFIG_FILE", str(custom_config))
+    captured: dict[str, str] = {}
+
+    def fake_from_file(*, file_location: str, profile_name: str):
+        captured["file_location"] = file_location
+        captured["profile_name"] = profile_name
+        return {"region": "us-phoenix-1", "security_token_file": "/tmp/session-token"}
+
+    monkeypatch.setattr(auth.oci.config, "from_file", fake_from_file)
+
+    loaded = auth._load_session_config(
+        SimpleNamespace(profile="VISION_SESSION", region=None)
+    )
+
+    assert captured == {
+        "file_location": str(custom_config),
+        "profile_name": "VISION_SESSION",
+    }
+    assert loaded == auth.SessionConfig(
+        profile="VISION_SESSION",
+        region="us-phoenix-1",
+        security_token_file="/tmp/session-token",
+    )
+
+
 def test_server_main_runs_shared_mcp_app(monkeypatch) -> None:
     called = []
     monkeypatch.setattr(server_module.mcp, "run", lambda: called.append("run"))
@@ -116,7 +144,7 @@ def test_image_resolver_rejects_unsafe_or_invalid_inputs(tmp_path) -> None:
         ImageResolver._object_storage(SimpleNamespace(oci_object=None))
     with pytest.raises(ImageResolverError, match="Unsupported image source type"):
         resolver.resolve(SimpleNamespace(source_type="bad"))
-    with pytest.raises(ImageResolverError, match="supported image type"):
+    with pytest.raises(ImageResolverError, match="JPEG and PNG"):
         ImageResolver(base_dir=str(base), allowed_extensions={".txt"}).resolve_local_file(
             ImageInput(source_type=ImageSourceType.FILE_PATH, path="text-image.txt")
         )

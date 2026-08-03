@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import oci
 import pytest
+from oracle_mcp_common import AuthContext, AuthType
 
+from oracle.oci_vision_mcp_server.authentication import session_signer
 from oracle.oci_vision_mcp_server.authentication.session_signer import (
     SessionAuthenticationError,
     session_auth_error_from_service_error,
@@ -250,9 +252,9 @@ def test_call_get_object_maps_get_kwargs() -> None:
 
 def test_create_vision_client_rejects_non_session_profile(monkeypatch) -> None:
     monkeypatch.setattr(
-        oci.config,
-        "from_file",
-        lambda profile_name: {"region": "us-ashburn-1"},
+        session_signer,
+        "build_auth_context",
+        lambda _options: (_ for _ in ()).throw(ValueError("not a session profile")),
     )
 
     with pytest.raises(SessionAuthenticationError) as exc_info:
@@ -261,34 +263,22 @@ def test_create_vision_client_rejects_non_session_profile(monkeypatch) -> None:
     assert exc_info.value.retryable is True
     assert exc_info.value.code == "OCI_SESSION_AUTH_REQUIRED"
     assert (
-        "oci session authenticate --profile-name OC1_ASH --region us-ashburn-1"
+        "oci session authenticate --profile-name OC1_ASH --region '<region>'"
         in str(exc_info.value)
     )
 
 
-def test_create_vision_client_uses_session_token_signer(monkeypatch, tmp_path) -> None:
-    token_file = tmp_path / "token"
-    token_file.write_text("session-token", encoding="utf-8")
-    key_file = tmp_path / "key.pem"
-    key_file.write_text("session-key", encoding="utf-8")
-
+def test_create_vision_client_uses_shared_session_auth_context(monkeypatch) -> None:
     captured = {}
+    signer = object()
 
-    monkeypatch.setattr(
-        oci.config,
-        "from_file",
-        lambda profile_name: {
-            "region": "us-ashburn-1",
-            "security_token_file": str(token_file),
-            "key_file": str(key_file),
-        },
-    )
-    monkeypatch.setattr(oci.signer, "load_private_key_from_file", lambda path: f"key:{path}")
-    monkeypatch.setattr(
-        oci.auth.signers,
-        "SecurityTokenSigner",
-        lambda token, private_key: {"token": token, "private_key": private_key},
-    )
+    def fake_auth_context(options):
+        assert options.auth_type is AuthType.SECURITY_TOKEN
+        assert options.profile_name == "OC1_ASH"
+        assert options.region == "us-phoenix-1"
+        return AuthContext(AuthType.SECURITY_TOKEN, {"region": "us-phoenix-1"}, signer, None, "us-phoenix-1", "OC1_ASH")
+
+    monkeypatch.setattr(session_signer, "build_auth_context", fake_auth_context)
 
     def fake_client(*, config, signer):
         captured["config"] = config
@@ -302,35 +292,20 @@ def test_create_vision_client_uses_session_token_signer(monkeypatch, tmp_path) -
     assert client == "vision-client"
     assert captured["config"]["region"] == "us-phoenix-1"
     assert captured["config"]["additional_user_agent"] == "oci-vision-mcp/0.1.0"
-    assert captured["signer"] == {
-        "token": "session-token",
-        "private_key": f"key:{key_file}",
-    }
+    assert captured["signer"] is signer
 
 
-def test_create_object_storage_client_uses_session_token_signer(monkeypatch, tmp_path) -> None:
-    token_file = tmp_path / "token"
-    token_file.write_text("session-token", encoding="utf-8")
-    key_file = tmp_path / "key.pem"
-    key_file.write_text("session-key", encoding="utf-8")
-
+def test_create_object_storage_client_uses_shared_session_auth_context(monkeypatch) -> None:
     captured = {}
+    signer = object()
 
-    monkeypatch.setattr(
-        oci.config,
-        "from_file",
-        lambda profile_name: {
-            "region": "us-ashburn-1",
-            "security_token_file": str(token_file),
-            "key_file": str(key_file),
-        },
-    )
-    monkeypatch.setattr(oci.signer, "load_private_key_from_file", lambda path: f"key:{path}")
-    monkeypatch.setattr(
-        oci.auth.signers,
-        "SecurityTokenSigner",
-        lambda token, private_key: {"token": token, "private_key": private_key},
-    )
+    def fake_auth_context(options):
+        assert options.auth_type is AuthType.SECURITY_TOKEN
+        assert options.profile_name == "OC1_ASH"
+        assert options.region == "us-phoenix-1"
+        return AuthContext(AuthType.SECURITY_TOKEN, {"region": "us-phoenix-1"}, signer, None, "us-phoenix-1", "OC1_ASH")
+
+    monkeypatch.setattr(session_signer, "build_auth_context", fake_auth_context)
 
     def fake_client(*, config, signer):
         captured["config"] = config
@@ -344,10 +319,7 @@ def test_create_object_storage_client_uses_session_token_signer(monkeypatch, tmp
     assert client == "object-storage-client"
     assert captured["config"]["region"] == "us-phoenix-1"
     assert captured["config"]["additional_user_agent"] == "oci-vision-mcp/0.1.0"
-    assert captured["signer"] == {
-        "token": "session-token",
-        "private_key": f"key:{key_file}",
-    }
+    assert captured["signer"] is signer
 
 
 def test_service_401_maps_to_session_auth_error() -> None:

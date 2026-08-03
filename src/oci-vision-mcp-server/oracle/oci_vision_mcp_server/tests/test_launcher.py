@@ -30,7 +30,7 @@ def test_ensure_session_auth_accepts_current_session(monkeypatch, tmp_path) -> N
     monkeypatch.setattr(
         oci.config,
         "from_file",
-        lambda profile_name: {
+        lambda **_kwargs: {
             "region": "us-ashburn-1",
             "security_token_file": str(token_file),
         },
@@ -50,7 +50,7 @@ def test_ensure_session_auth_refreshes_expired_session(monkeypatch, tmp_path) ->
     monkeypatch.setattr(
         oci.config,
         "from_file",
-        lambda profile_name: {
+        lambda **_kwargs: {
             "region": "us-ashburn-1",
             "security_token_file": str(token_file),
         },
@@ -78,7 +78,7 @@ def test_ensure_session_auth_runs_authenticate_when_enabled(monkeypatch, tmp_pat
     monkeypatch.setattr(
         oci.config,
         "from_file",
-        lambda profile_name: {
+        lambda **_kwargs: {
             "region": "us-ashburn-1",
             "security_token_file": str(token_file),
         },
@@ -117,7 +117,7 @@ def test_ensure_session_auth_raises_when_authenticate_fails(monkeypatch, tmp_pat
     monkeypatch.setattr(
         oci.config,
         "from_file",
-        lambda profile_name: {
+        lambda **_kwargs: {
             "region": "us-ashburn-1",
             "security_token_file": str(token_file),
         },
