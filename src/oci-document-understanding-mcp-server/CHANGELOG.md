@@ -16,6 +16,8 @@
 ### Fixed
 
 - Honor `include_confidence=false` by omitting confidence values from extraction results.
+- Serialize and map OCI SDK response models into extraction and classification results.
+- Apply `confidence_threshold` to classification results.
 
 ## 0.1.0
 

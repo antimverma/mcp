@@ -6,6 +6,8 @@ https://oss.oracle.com/licenses/upl.
 
 from datetime import datetime, timezone
 
+import oci
+
 from oracle.oci_document_understanding_mcp_server.models import (
     ClassificationOptions,
     ClassificationRequest,
@@ -78,3 +80,69 @@ def test_extraction_parser_ignores_unstructured_pages_and_lines() -> None:
     result = ExtractionOutputParser().parse(_raw({"pages": ["bad", {"lines": ["bad", {"text": "line"}]}]}))
 
     assert result["text"] == "line"
+
+
+def test_parsers_map_real_oci_sdk_result_models_for_advertised_outputs() -> None:
+    models = oci.ai_document.models
+    result = models.AnalyzeDocumentResult(
+        pages=[
+            models.Page(
+                page_number=1,
+                lines=[models.Line(text="Invoice 123", confidence=0.99)],
+                document_fields=[
+                    models.DocumentField(
+                        field_type="KEY_VALUE",
+                        field_label=models.FieldLabel(name="Invoice Number", confidence=0.98),
+                        field_value=models.FieldValue(value_type="STRING", text="123", confidence=0.97),
+                    )
+                ],
+                tables=[models.Table(row_count=1, column_count=2, confidence=0.96)],
+                bar_codes=[models.BarCode(value="code-123", confidence=0.95)],
+                signatures=[models.Signature(confidence=0.94)],
+                selection_marks=[models.SelectionMark(state="SELECTED", confidence=0.93)],
+            )
+        ],
+        detected_document_types=[models.DetectedDocumentType(document_type="INVOICE", confidence=0.98)],
+    )
+    payload = oci.util.to_dict(result)
+
+    extraction = ExtractionOutputParser().parse(_raw(payload))
+    classification = ClassificationOutputParser().parse(_raw(payload))
+
+    assert extraction["text"] == "Invoice 123"
+    assert extraction["keyValues"][0]["field_value"]["text"] == "123"
+    assert extraction["tables"][0]["confidence"] == 0.96
+    assert {element["type"] for element in extraction["elements"]} == {"BAR_CODE", "SIGNATURE", "SELECTION_MARK"}
+    assert classification["documentType"] == "INVOICE"
+    assert classification["confidence"] == 0.98
+
+
+def test_classification_parser_applies_threshold_and_recalculates_top_result() -> None:
+    parser = ClassificationOutputParser()
+
+    filtered = parser.parse(
+        _raw(
+            {
+                "classifications": [
+                    {"label": "INVOICE", "confidence": 0.97},
+                    {"label": "RECEIPT", "confidence": 0.02},
+                ],
+                "confidenceThreshold": 0.5,
+            }
+        )
+    )
+    empty = parser.parse(
+        _raw(
+            {
+                "classifications": [{"label": "RECEIPT", "confidence": 0.02}],
+                "confidenceThreshold": 0.5,
+            }
+        )
+    )
+
+    assert filtered["classifications"] == [{"label": "INVOICE", "confidence": 0.97}]
+    assert filtered["documentType"] == "INVOICE"
+    assert filtered["confidence"] == 0.97
+    assert empty["classifications"] == []
+    assert empty["documentType"] is None
+    assert empty["confidence"] is None

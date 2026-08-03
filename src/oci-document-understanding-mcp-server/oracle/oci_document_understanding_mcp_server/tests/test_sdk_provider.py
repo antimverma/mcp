@@ -7,6 +7,7 @@ https://oss.oracle.com/licenses/upl.
 import sys
 from types import SimpleNamespace
 
+import oci as real_oci
 import pytest
 
 from oracle.oci_document_understanding_mcp_server.models import (
@@ -25,10 +26,11 @@ class FakeClient:
     created: list[tuple[dict, object | None]] = []
     responses: list[object] = []
 
-    def __init__(self, config: dict, signer: object | None = None) -> None:
+    def __init__(self, config: dict, signer: object | None = None, **kwargs: object) -> None:
         self.config = config
         self.signer = signer
-        self.base_client = SimpleNamespace(endpoint=None, set_endpoint=lambda endpoint: setattr(self.base_client, "endpoint", endpoint))
+        self.client_kwargs = kwargs
+        self.base_client = SimpleNamespace(set_endpoint=lambda endpoint: setattr(self, "endpoint", endpoint))
         FakeClient.created.append((config, signer))
 
     def analyze_document(self, analyze_document_details: object) -> object:
@@ -61,6 +63,9 @@ def _install_fake_oci(monkeypatch: pytest.MonkeyPatch, token_file: str) -> None:
     class FakeInstanceSigner:
         pass
 
+    class FakeCircuitBreakerStrategy:
+        pass
+
     def from_file(_path: str, _profile: str) -> dict:
         return {
             "region": "us-phoenix-1",
@@ -68,9 +73,15 @@ def _install_fake_oci(monkeypatch: pytest.MonkeyPatch, token_file: str) -> None:
             "key_file": "/tmp/key.pem",
         }
 
+    def to_dict(value: object) -> object:
+        return value.payload if isinstance(value, FakeData) else real_oci.util.to_dict(value)
+
     fake_oci = SimpleNamespace(
         config=SimpleNamespace(from_file=from_file, DEFAULT_LOCATION="~/.oci/config"),
         signer=SimpleNamespace(load_private_key_from_file=lambda _path: object()),
+        util=SimpleNamespace(to_dict=to_dict),
+        retry=SimpleNamespace(DEFAULT_RETRY_STRATEGY=object()),
+        circuit_breaker=SimpleNamespace(CircuitBreakerStrategy=FakeCircuitBreakerStrategy),
         auth=SimpleNamespace(
             signers=SimpleNamespace(
                 SecurityTokenSigner=FakeSecurityTokenSigner,
@@ -99,11 +110,11 @@ def _install_fake_oci(monkeypatch: pytest.MonkeyPatch, token_file: str) -> None:
     )
 
 
-def _config(auth_mode: str, *, endpoint: str | None = None, compartment: str | None = "ocid1.compartment.oc1..example") -> OciDocumentUnderstandingConfig:
+def _config(auth_mode: str, *, compartment: str | None = "ocid1.compartment.oc1..example") -> OciDocumentUnderstandingConfig:
     return OciDocumentUnderstandingConfig(
         runtime_mode="local",
         region="us-phoenix-1",
-        endpoint=endpoint,
+        endpoint=None,
         auth_mode=auth_mode,
         default_compartment_id=compartment,
         config_file_path=None,
@@ -138,12 +149,14 @@ def test_sdk_provider_uses_shared_auth_and_sets_user_agent_for_auth_paths(
 
     monkeypatch.setattr(sdk_provider, "build_auth_context", fake_build_auth_context)
 
-    provider = OciSdkDocumentUnderstandingProvider(_config(auth_mode, endpoint="https://documents.example.com"))
+    provider = OciSdkDocumentUnderstandingProvider(_config(auth_mode))
 
-    assert provider.client.base_client.endpoint == "https://documents.example.com"
     assert FakeClient.created[-1][0]["additional_user_agent"] == "oci-document-understanding-mcp/0.1.0"
     assert FakeClient.created[-1][0]["region"] == expected_region
     assert FakeClient.created[-1][1] is signer
+    assert provider.client.client_kwargs["retry_strategy"] is not None
+    assert provider.client.client_kwargs["circuit_breaker_strategy"] is not None
+    assert callable(provider.client.client_kwargs["circuit_breaker_callback"])
     assert options_seen[-1].auth_type == auth_mode
     assert options_seen[-1].region is None
 
@@ -161,6 +174,17 @@ def test_sdk_provider_uses_server_region_only_when_common_auth_has_none(monkeypa
     OciSdkDocumentUnderstandingProvider(_config("instance-principal"))
 
     assert FakeClient.created[-1][0]["region"] == "us-phoenix-1"
+
+
+def test_sdk_provider_uses_configured_endpoint(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    token_file = tmp_path / "token"
+    token_file.write_text("token", encoding="utf-8")
+    _install_fake_oci(monkeypatch, str(token_file))
+    config = _config("api-key").model_copy(update={"endpoint": "https://document.example.test"})
+
+    provider = OciSdkDocumentUnderstandingProvider(config)
+
+    assert provider.client.endpoint == "https://document.example.test"
 
 
 def test_sdk_provider_removes_confidence_when_requested(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
@@ -189,6 +213,31 @@ def test_sdk_provider_removes_confidence_when_requested(monkeypatch: pytest.Monk
     )
 
     assert result.payload["keyValues"] == [{"key": "invoice", "nested": {}}]
+
+
+def test_sdk_provider_serializes_real_oci_sdk_result_model(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    token_file = tmp_path / "token"
+    token_file.write_text("token", encoding="utf-8")
+    _install_fake_oci(monkeypatch, str(token_file))
+    FakeClient.responses.append(
+        SimpleNamespace(
+            data=real_oci.ai_document.models.AnalyzeDocumentResult(
+                pages=[real_oci.ai_document.models.Page(page_number=1, lines=[real_oci.ai_document.models.Line(text="hello", confidence=0.9)])]
+            ),
+            headers={"opc-request-id": "extract-request"},
+        )
+    )
+    provider = OciSdkDocumentUnderstandingProvider(_config("api-key"))
+
+    result = provider.extract(
+        ExtractionRequest(
+            document_source=DocumentSource(source_type="INLINE_BASE64", document="SGVsbG8=", mime_type="application/pdf"),
+            features=["TEXT"],
+            options=ExtractionOptions(language=None, include_confidence=True),
+        )
+    )
+
+    assert result.payload["pages"][0]["lines"][0]["text"] == "hello"
 
 
 def test_sdk_provider_requires_compartment_before_building_request(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:

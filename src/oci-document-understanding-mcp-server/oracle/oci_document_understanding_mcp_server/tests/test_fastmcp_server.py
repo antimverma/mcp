@@ -84,6 +84,26 @@ def test_fastmcp_extract_omits_confidence_when_requested(monkeypatch) -> None:
     assert "confidence" not in str(result.structured_content["data"])
 
 
+def test_fastmcp_classify_applies_confidence_threshold(monkeypatch) -> None:
+    _reset_server()
+    monkeypatch.setattr(server, "create_provider", lambda config: StubOciDocumentUnderstandingProvider(config))
+    monkeypatch.setattr(server.OciDocumentUnderstandingConfig, "from_environment", staticmethod(_stub_config))
+
+    result = asyncio.run(
+        server.mcp.call_tool(
+            "document_classify",
+            {
+                "document": "SGVsbG8=",
+                "mime_type": "application/pdf",
+                "options": {"confidence_threshold": 0.5},
+            },
+        )
+    )
+
+    assert result.structured_content["data"]["classifications"] == [{"label": "INVOICE", "confidence": 0.97}]
+    assert result.structured_content["data"]["documentType"] == "INVOICE"
+
+
 def test_direct_tool_functions_preserve_legacy_and_structured_inputs(monkeypatch) -> None:
     _reset_server()
     monkeypatch.setattr(server, "create_provider", lambda config: StubOciDocumentUnderstandingProvider(config))

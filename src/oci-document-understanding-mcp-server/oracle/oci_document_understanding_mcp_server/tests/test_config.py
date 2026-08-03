@@ -20,6 +20,7 @@ def test_config_defaults_to_local_session_token(monkeypatch: pytest.MonkeyPatch)
     assert config.runtime_mode == "local"
     assert config.auth_mode == "session-token"
     assert config.region == "us-ashburn-1"
+    assert config.endpoint is None
     assert config.default_compartment_id is None
     assert config.profile == "DEFAULT"
 
@@ -30,12 +31,14 @@ def test_config_supports_stub_mode_and_config_profile(monkeypatch: pytest.Monkey
     monkeypatch.setenv("OCI_REGION", "us-phoenix-1")
     monkeypatch.setenv("OCI_COMPARTMENT_ID", "ocid1.compartment.oc1..example")
     monkeypatch.setenv("OCI_CONFIG_PROFILE", "MYPROFILE")
+    monkeypatch.setenv("OCI_DOCUMENT_ENDPOINT", "https://document.example.test")
 
     config = OciDocumentUnderstandingConfig.from_environment()
 
     assert config.runtime_mode == "stub"
     assert config.auth_mode == "none"
     assert config.region == "us-phoenix-1"
+    assert config.endpoint == "https://document.example.test"
     assert config.default_compartment_id == "ocid1.compartment.oc1..example"
     assert config.profile == "MYPROFILE"
 

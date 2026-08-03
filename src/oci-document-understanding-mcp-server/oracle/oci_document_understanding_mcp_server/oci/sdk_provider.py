@@ -5,6 +5,7 @@ https://oss.oracle.com/licenses/upl.
 """
 
 from datetime import datetime, timezone
+import logging
 from typing import Any
 
 from oracle_mcp_common import AuthOptions, build_auth_context
@@ -17,6 +18,7 @@ from oracle.oci_document_understanding_mcp_server.oci.response_filter import wit
 
 _user_agent_name = __project__.split("oracle.", 1)[1].split("-server", 1)[0]
 _ADDITIONAL_UA = f"{_user_agent_name}/{__version__}"
+logger = logging.getLogger(__name__)
 
 
 class OciSdkDocumentUnderstandingProvider:
@@ -47,6 +49,7 @@ class OciSdkDocumentUnderstandingProvider:
         payload = self._response_to_payload(response)
         payload.setdefault("provider", "oci-sdk")
         payload.setdefault("requestConfig", classification_config(request, self.config))
+        payload.setdefault("confidenceThreshold", request.options.confidence_threshold)
         return RawOciDocumentResult(
             request_id=self._request_id(response),
             operation="classify",
@@ -72,10 +75,16 @@ class OciSdkDocumentUnderstandingProvider:
         # oracle-mcp-common resolves OCI_REGION, then the profile or signer
         # region. Preserve this server's documented IAD value only as a final fallback.
         client_config.setdefault("region", self.config.region)
-        client = oci.ai_document.AIServiceDocumentClient(client_config, signer=auth_context.signer)
-
+        client = oci.ai_document.AIServiceDocumentClient(
+            client_config,
+            signer=auth_context.signer,
+            retry_strategy=oci.retry.DEFAULT_RETRY_STRATEGY,
+            circuit_breaker_strategy=oci.circuit_breaker.CircuitBreakerStrategy(),
+            circuit_breaker_callback=lambda error: logger.warning("OCI Document Understanding circuit breaker triggered: %s", error),
+        )
         if self.config.endpoint:
             client.base_client.set_endpoint(self.config.endpoint)
+
         return oci, client
 
     def _analyze_document(self, request: ExtractionRequest | ClassificationRequest, operation: str, feature_types: list[str]) -> Any:
@@ -139,10 +148,11 @@ class OciSdkDocumentUnderstandingProvider:
     def _response_to_payload(self, response: Any) -> dict[str, Any]:
         """Converts the SDK response object into a JSON-ready payload."""
         data = getattr(response, "data", response)
-        if hasattr(data, "to_dict"):
-            return data.to_dict()
         if isinstance(data, dict):
             return data
+        serialized = self.oci.util.to_dict(data)
+        if isinstance(serialized, dict):
+            return serialized
         return {"raw": str(data)}
 
     def _request_id(self, response: Any) -> str:

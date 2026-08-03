@@ -17,9 +17,9 @@ class ExtractionOutputParser:
         payload = raw_result.payload
         return {
             "text": payload.get("text") or payload.get("extractedText") or self._text_from_pages(payload),
-            "keyValues": payload.get("keyValues") or payload.get("key_value_fields") or [],
-            "tables": payload.get("tables") or [],
-            "elements": payload.get("elements") or [],
+            "keyValues": payload.get("keyValues") or payload.get("key_value_fields") or self._page_values(payload, "document_fields"),
+            "tables": payload.get("tables") or self._page_values(payload, "tables"),
+            "elements": payload.get("elements") or self._elements_from_pages(payload),
             "metadata": {
                 "requestId": raw_result.request_id,
                 "operation": raw_result.operation,
@@ -42,3 +42,29 @@ class ExtractionOutputParser:
                         lines.append(line["text"])
         return "\n".join(lines)
 
+    def _page_values(self, payload: dict[str, Any], name: str) -> list[dict[str, Any]]:
+        """Flattens an OCI SDK page-level collection into the public result."""
+        values: list[dict[str, Any]] = []
+        for page in payload.get("pages") or []:
+            if not isinstance(page, dict):
+                continue
+            for value in page.get(name) or []:
+                if isinstance(value, dict):
+                    values.append(value)
+        return values
+
+    def _elements_from_pages(self, payload: dict[str, Any]) -> list[dict[str, Any]]:
+        """Maps OCI page-level document elements into a single public collection."""
+        elements: list[dict[str, Any]] = []
+        for page in payload.get("pages") or []:
+            if not isinstance(page, dict):
+                continue
+            for source_name, element_type in (
+                ("bar_codes", "BAR_CODE"),
+                ("signatures", "SIGNATURE"),
+                ("selection_marks", "SELECTION_MARK"),
+            ):
+                for value in page.get(source_name) or []:
+                    if isinstance(value, dict):
+                        elements.append({"type": element_type, "page": page.get("page_number"), **value})
+        return elements
