@@ -73,7 +73,7 @@ def session_auth_command(context: SessionAuthContext) -> str:
         region,
     ]
     if os.getenv("OCI_CONFIG_FILE"):
-        parts.extend(["--config-file", resolve_config_file()])
+        parts.extend(["--config-location", resolve_config_file()])
     return " ".join(shlex.quote(part) for part in parts)
 
 

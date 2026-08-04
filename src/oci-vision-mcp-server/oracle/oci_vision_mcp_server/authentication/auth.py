@@ -150,7 +150,7 @@ def _run_session_authenticate(
     ]
     command.extend(["--region", region])
     if config_file:
-        command.extend(["--config-file", config_file])
+        command.extend(["--config-location", config_file])
     completed = subprocess.run(
         command,
         check=False,
@@ -175,7 +175,7 @@ def _session_authenticate_command(
         region or "<region>",
     ]
     if config_file:
-        command.extend(["--config-file", config_file])
+        command.extend(["--config-location", config_file])
     return shlex.join(command)
 
 

@@ -13,6 +13,8 @@ from oracle_mcp_common import AuthContext, AuthType
 from oracle.oci_vision_mcp_server.authentication import session_signer
 from oracle.oci_vision_mcp_server.authentication.session_signer import (
     SessionAuthenticationError,
+    SessionAuthContext,
+    session_auth_command,
     session_auth_error_from_service_error,
 )
 from oracle.oci_vision_mcp_server.oci_clients.object_storage import (
@@ -366,3 +368,14 @@ def test_service_401_uses_selected_profile_region_when_no_region_is_explicit(mon
     assert auth_error is not None
     assert auth_error.retryable is True
     assert "oci session authenticate --profile-name DEFAULT --region us-phoenix-1" in str(auth_error)
+
+
+def test_session_auth_command_uses_custom_config_as_authentication_destination(monkeypatch) -> None:
+    monkeypatch.setenv("OCI_CONFIG_FILE", "/private/tmp/custom-oci-config")
+
+    command = session_auth_command(
+        SessionAuthContext(profile="DEFAULT", region="us-phoenix-1")
+    )
+
+    assert "--config-location /private/tmp/custom-oci-config" in command
+    assert "--config-file" not in command

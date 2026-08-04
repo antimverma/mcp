@@ -61,6 +61,7 @@ from ...config.schemas import (
     CancelImageJobInput,
     CreateImageJobInput,
     FaceToolInput,
+    FilePathImageInput,
     GetImageJobInput,
     ImageAnalysisFeature,
     ImageInput,
@@ -374,7 +375,7 @@ def run_cancel_image_job_tool(raw_args: dict[str, Any], *, tool: str) -> CallToo
     )
 
 
-def image_info(image: ImageInput | Any) -> dict[str, Any]:
+def image_info(image: ImageInput | FilePathImageInput) -> dict[str, Any]:
     source_type = image.source_type
     info: dict[str, Any] = {
         "source_type": getattr(source_type, "value", str(source_type)),

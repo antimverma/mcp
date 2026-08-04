@@ -22,8 +22,8 @@
 - Include image-validation and Object Storage download code in the coverage gate.
 - Honor `OCI_CONFIG_FILE` during session-token validation and refresh checks.
 - Preserve the selected profile's configured region when handling an OCI session-authentication failure.
-- Pass `OCI_CONFIG_FILE` to OCI CLI session repair commands and remediation guidance.
-- Correct the documented auto-auth configuration default to `false`.
+- Use `OCI_CONFIG_FILE` consistently for OCI CLI session repair: `--config-file` for refresh and `--config-location` for authentication.
+- Correct the refresh-session and auto-auth configuration catalog defaults.
 
 ## 0.1.0
 

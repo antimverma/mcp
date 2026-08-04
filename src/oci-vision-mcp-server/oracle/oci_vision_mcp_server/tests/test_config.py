@@ -18,6 +18,13 @@ from oracle.oci_vision_mcp_server.config.settings import (
 )
 
 
+def test_session_auth_catalog_defaults_match_runtime_defaults() -> None:
+    catalog = {item["name"]: item for item in env_var_catalog()}
+
+    assert catalog["OCI_MCP_REFRESH_SESSION"]["default"] == "true"
+    assert catalog["OCI_MCP_AUTO_AUTH"]["default"] == "false"
+
+
 def test_required_env_values_are_resolved_and_locked() -> None:
     config = get_resolved_config()
 

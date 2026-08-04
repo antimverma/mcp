@@ -12,6 +12,7 @@ import time
 from types import SimpleNamespace
 
 import oci
+import pytest
 
 from oracle.oci_vision_mcp_server.authentication import auth
 
@@ -114,10 +115,29 @@ def test_ensure_session_auth_runs_authenticate_when_enabled(monkeypatch, tmp_pat
             "DEFAULT",
             "--region",
             "us-ashburn-1",
-            "--config-file",
+            "--config-location",
             "/private/tmp/custom-oci-config",
         ],
     ]
+
+
+def test_session_auth_recovery_command_uses_custom_config_destination(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("OCI_CONFIG_PROFILE", "DEFAULT")
+    monkeypatch.setenv("OCI_REGION", "us-ashburn-1")
+    monkeypatch.setenv("OCI_CONFIG_FILE", "/private/tmp/custom-oci-config")
+    monkeypatch.setenv("OCI_MCP_AUTO_AUTH", "0")
+    monkeypatch.setenv("OCI_MCP_REFRESH_SESSION", "0")
+    monkeypatch.setattr(
+        oci.config,
+        "from_file",
+        lambda **_kwargs: {
+            "region": "us-ashburn-1",
+            "security_token_file": str(tmp_path / "missing-token"),
+        },
+    )
+
+    with pytest.raises(RuntimeError, match="--config-location /private/tmp/custom-oci-config"):
+        auth.ensure_session_auth()
 
 
 def test_ensure_session_auth_raises_when_authenticate_fails(monkeypatch, tmp_path) -> None:
