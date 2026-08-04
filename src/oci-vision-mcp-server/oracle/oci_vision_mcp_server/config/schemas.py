@@ -113,6 +113,15 @@ class ImageInput(BaseModel):
         return self
 
 
+class FilePathImageInput(BaseModel):
+    """A local image input accepted by Object Storage upload tools."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    source_type: Literal[ImageSourceType.FILE_PATH]
+    path: str = Field(min_length=1, description="Filesystem path to an image file.")
+
+
 class ToolOptions(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -288,8 +297,8 @@ class ObjectStorageUploadOptions(BaseModel):
 class ObjectStorageUploadInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    image: ImageInput | None = None
-    images: list[ImageInput] | None = Field(
+    image: FilePathImageInput | None = None
+    images: list[FilePathImageInput] | None = Field(
         default=None,
         min_length=1,
         max_length=MAX_OBJECT_STORAGE_BULK_UPLOAD_IMAGES,
@@ -326,10 +335,6 @@ class ObjectStorageUploadInput(BaseModel):
     def validate_upload_source(self) -> "ObjectStorageUploadInput":
         if (self.image is None) == (self.images is None):
             raise ValueError("Provide exactly one of image or images.")
-        selected_images = [self.image] if self.image is not None else list(self.images or [])
-        for image in selected_images:
-            if image.source_type != ImageSourceType.FILE_PATH:
-                raise ValueError("upload_image_to_object_storage only accepts source_type=file_path.")
         if self.images is not None:
             if not self.destination or not self.destination.namespace or not self.destination.bucket:
                 raise ValueError("Bulk upload requires destination.namespace and destination.bucket.")

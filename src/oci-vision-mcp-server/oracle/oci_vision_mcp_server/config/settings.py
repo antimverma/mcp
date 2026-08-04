@@ -195,7 +195,7 @@ ENV_VAR_CATALOG: tuple[EnvVarInfo, ...] = (
         name=ENV_REFRESH_SESSION,
         purpose="Allow startup to refresh expired OCI session tokens.",
         required=False,
-        default="true",
+        default=str(DEFAULT_AUTO_AUTH).lower(),
         used_in="config/settings.py, authentication/auth.py",
         effect=(
             "When true, startup and tool calls may run "

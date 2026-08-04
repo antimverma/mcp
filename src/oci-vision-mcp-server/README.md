@@ -65,7 +65,7 @@ local interactive use, set `OCI_MCP_AUTO_AUTH=true`.
 | `create_image_job` | Create an async OCI Vision image job for Object Storage inputs. |
 | `get_image_job` | Get lifecycle state and metadata for an OCI Vision image job. |
 | `cancel_image_job` | Cancel an OCI Vision image job when explicitly confirmed. |
-| `upload_image_to_object_storage` | Upload a local/base64 image to OCI Object Storage. |
+| `upload_image_to_object_storage` | Upload one or more local `file_path` images to OCI Object Storage. |
 | `list_object_storage_objects` | List Object Storage objects for batch or async Vision workflows. |
 | `fetch_object_storage_object` | Download one or more Object Storage objects to local files. |
 | `get_analysis_result` | Read a stored raw OCI result by MCP request id. |

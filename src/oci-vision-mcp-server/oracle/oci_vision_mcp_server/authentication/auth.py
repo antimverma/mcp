@@ -9,6 +9,7 @@ from __future__ import annotations
 import base64
 import binascii
 import json
+import os
 import shlex
 import subprocess
 import sys
@@ -32,12 +33,17 @@ class SessionConfig:
 def ensure_session_auth() -> None:
     resolved_config = get_resolved_config(persist_generated_profile=True)
     config = _load_session_config(resolved_config)
+    config_file = _session_config_file_argument()
 
     if _session_is_current(config, skew_seconds=resolved_config.token_expiry_skew_seconds):
         return
 
     if resolved_config.refresh_session and config.security_token_file:
-        _run_session_refresh(config.profile, executable=resolved_config.session_auth_command)
+        _run_session_refresh(
+            config.profile,
+            executable=resolved_config.session_auth_command,
+            config_file=config_file,
+        )
         config = _load_session_config(resolved_config)
         if _session_is_current(config, skew_seconds=resolved_config.token_expiry_skew_seconds):
             return
@@ -53,6 +59,7 @@ def ensure_session_auth() -> None:
             config.profile,
             region,
             executable=resolved_config.session_auth_command,
+            config_file=config_file,
         )
         config = _load_session_config(resolved_config)
         if _session_is_current(config, skew_seconds=resolved_config.token_expiry_skew_seconds):
@@ -62,6 +69,7 @@ def ensure_session_auth() -> None:
         config.profile,
         config.region or resolved_config.region,
         executable=resolved_config.session_auth_command,
+        config_file=config_file,
     )
     raise RuntimeError(f"run `{command}` and restart the MCP server")
 
@@ -120,13 +128,19 @@ def _jwt_expiry(token: str) -> int | None:
     return exp if isinstance(exp, int) else None
 
 
-def _run_session_refresh(profile: str, *, executable: str) -> None:
+def _run_session_refresh(
+    profile: str, *, executable: str, config_file: str | None = None
+) -> None:
     command = [executable, "session", "refresh", "--profile", profile]
+    if config_file:
+        command.extend(["--config-file", config_file])
     # Refresh can fail for expired sessions; authenticate may still repair it.
     subprocess.run(command, check=False, stdin=sys.stdin, stdout=sys.stderr, stderr=sys.stderr)
 
 
-def _run_session_authenticate(profile: str, region: str, *, executable: str) -> None:
+def _run_session_authenticate(
+    profile: str, region: str, *, executable: str, config_file: str | None = None
+) -> None:
     command = [
         executable,
         "session",
@@ -135,6 +149,8 @@ def _run_session_authenticate(profile: str, region: str, *, executable: str) -> 
         profile,
     ]
     command.extend(["--region", region])
+    if config_file:
+        command.extend(["--config-file", config_file])
     completed = subprocess.run(
         command,
         check=False,
@@ -146,15 +162,23 @@ def _run_session_authenticate(profile: str, region: str, *, executable: str) -> 
         raise RuntimeError(f"OCI session authentication failed. Run `{shlex.join(command)}` and retry.")
 
 
-def _session_authenticate_command(profile: str, region: str | None, *, executable: str) -> str:
-    return shlex.join(
-        [
-            executable,
-            "session",
-            "authenticate",
-            "--profile-name",
-            profile,
-            "--region",
-            region or "<region>",
-        ]
-    )
+def _session_authenticate_command(
+    profile: str, region: str | None, *, executable: str, config_file: str | None = None
+) -> str:
+    command = [
+        executable,
+        "session",
+        "authenticate",
+        "--profile-name",
+        profile,
+        "--region",
+        region or "<region>",
+    ]
+    if config_file:
+        command.extend(["--config-file", config_file])
+    return shlex.join(command)
+
+
+def _session_config_file_argument() -> str | None:
+    """Pass a custom config path to OCI CLI session-repair commands."""
+    return resolve_config_file() if os.getenv("OCI_CONFIG_FILE") else None

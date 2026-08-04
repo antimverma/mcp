@@ -15,11 +15,15 @@
 - Use the shared `oracle-mcp-common` authentication context for OCI Vision and Object Storage clients.
 - Default the OCI profile to `DEFAULT` and defer Vision compartment validation until a Vision operation requires it.
 - Restrict Vision image inputs to OCI-supported JPEG/PNG images no larger than 5 MiB.
+- Limit Object Storage uploads to local `file_path` image inputs, matching the supported upload implementation.
 
 ### Fixed
 
 - Include image-validation and Object Storage download code in the coverage gate.
 - Honor `OCI_CONFIG_FILE` during session-token validation and refresh checks.
+- Preserve the selected profile's configured region when handling an OCI session-authentication failure.
+- Pass `OCI_CONFIG_FILE` to OCI CLI session repair commands and remediation guidance.
+- Correct the documented auto-auth configuration default to `false`.
 
 ## 0.1.0
 

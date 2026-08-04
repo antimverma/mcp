@@ -33,6 +33,7 @@ from ...io.image_loader import ImageResolver, ImageResolverError, LocalImageFile
 from ...io.result_store import ResultStoreError, generate_request_id, store_tool_result
 from ...config.schemas import (
     ErrorDetail,
+    FilePathImageInput,
     ImageInput,
     ObjectStorageDestinationInput,
     ObjectStorageUploadEnvelope,
@@ -55,10 +56,10 @@ from .helpers import (
 
 @mcp.tool(name=TOOL_UPLOAD_IMAGE_TO_OBJECT_STORAGE)
 def upload_image_to_object_storage(
-    image: ImageInput | None = None,
+    image: FilePathImageInput | None = None,
     images: (
         Annotated[
-            list[ImageInput],
+            list[FilePathImageInput],
             Field(min_length=1, max_length=MAX_OBJECT_STORAGE_BULK_UPLOAD_IMAGES),
         ]
         | None

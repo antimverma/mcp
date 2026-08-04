@@ -342,3 +342,27 @@ def test_service_401_maps_to_session_auth_error() -> None:
         "oci session authenticate --profile-name OC1_ASH --region us-ashburn-1"
         in str(auth_error)
     )
+
+
+def test_service_401_uses_selected_profile_region_when_no_region_is_explicit(monkeypatch) -> None:
+    monkeypatch.setattr(
+        session_signer.oci.config,
+        "from_file",
+        lambda **_kwargs: {"region": "us-phoenix-1"},
+    )
+    service_error = oci.exceptions.ServiceError(
+        status=401,
+        code="NotAuthenticated",
+        headers={},
+        message="session expired",
+    )
+
+    auth_error = session_auth_error_from_service_error(
+        service_error,
+        profile="DEFAULT",
+        region=None,
+    )
+
+    assert auth_error is not None
+    assert auth_error.retryable is True
+    assert "oci session authenticate --profile-name DEFAULT --region us-phoenix-1" in str(auth_error)

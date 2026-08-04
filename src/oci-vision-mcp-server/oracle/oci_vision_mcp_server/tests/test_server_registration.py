@@ -136,7 +136,11 @@ async def test_fastmcp_schema_requires_image_source_type() -> None:
     assert parallel_schema["properties"]["items"]["maxItems"] == MAX_PARALLEL_ANALYZE_ITEMS
     assert parallel_schema["properties"]["max_parallel"]["maximum"] == MAX_PARALLEL_ANALYZE_MAX_PARALLEL
     assert "features" in parallel_schema["properties"]["items"]["items"]["properties"]
-    assert "file_path" in upload_schema["properties"]["image"]["anyOf"][0]["properties"]["source_type"]["enum"]
+    upload_image_schema = upload_schema["properties"]["image"]["anyOf"][0]
+    assert upload_image_schema["properties"]["source_type"]["const"] == "file_path"
+    assert "data" not in upload_image_schema["properties"]
+    assert "oci_object" not in upload_image_schema["properties"]
+    assert "url" not in upload_image_schema["properties"]
     assert "images" in upload_schema["properties"]
     upload_images_schema = next(
         item

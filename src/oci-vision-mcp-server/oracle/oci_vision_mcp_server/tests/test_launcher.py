@@ -47,6 +47,7 @@ def test_ensure_session_auth_refreshes_expired_session(monkeypatch, tmp_path) ->
 
     monkeypatch.setenv("OCI_CONFIG_PROFILE", "DEFAULT")
     monkeypatch.setenv("OCI_REGION", "us-ashburn-1")
+    monkeypatch.delenv("OCI_CONFIG_FILE", raising=False)
     monkeypatch.setattr(
         oci.config,
         "from_file",
@@ -75,6 +76,7 @@ def test_ensure_session_auth_runs_authenticate_when_enabled(monkeypatch, tmp_pat
     monkeypatch.setenv("OCI_CONFIG_PROFILE", "DEFAULT")
     monkeypatch.setenv("OCI_REGION", "us-ashburn-1")
     monkeypatch.setenv("OCI_MCP_AUTO_AUTH", "1")
+    monkeypatch.setenv("OCI_CONFIG_FILE", "/private/tmp/custom-oci-config")
     monkeypatch.setattr(
         oci.config,
         "from_file",
@@ -95,7 +97,15 @@ def test_ensure_session_auth_runs_authenticate_when_enabled(monkeypatch, tmp_pat
     auth.ensure_session_auth()
 
     assert commands == [
-        ["oci", "session", "refresh", "--profile", "DEFAULT"],
+        [
+            "oci",
+            "session",
+            "refresh",
+            "--profile",
+            "DEFAULT",
+            "--config-file",
+            "/private/tmp/custom-oci-config",
+        ],
         [
             "oci",
             "session",
@@ -104,6 +114,8 @@ def test_ensure_session_auth_runs_authenticate_when_enabled(monkeypatch, tmp_pat
             "DEFAULT",
             "--region",
             "us-ashburn-1",
+            "--config-file",
+            "/private/tmp/custom-oci-config",
         ],
     ]
 

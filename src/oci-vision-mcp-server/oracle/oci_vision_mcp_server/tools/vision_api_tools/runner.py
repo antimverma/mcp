@@ -374,19 +374,21 @@ def run_cancel_image_job_tool(raw_args: dict[str, Any], *, tool: str) -> CallToo
     )
 
 
-def image_info(image: ImageInput) -> dict[str, Any]:
+def image_info(image: ImageInput | Any) -> dict[str, Any]:
+    source_type = image.source_type
     info: dict[str, Any] = {
-        "source_type": image.source_type.value,
-        "path": image.path,
+        "source_type": getattr(source_type, "value", str(source_type)),
+        "path": getattr(image, "path", None),
         "object_name": None,
         "namespace": None,
         "bucket": None,
     }
-    if image.oci_object:
-        info["namespace"] = image.oci_object.namespace
-        info["bucket"] = image.oci_object.bucket
-        info["object_name"] = image.oci_object.object_name
-    if image.url:
+    oci_object = getattr(image, "oci_object", None)
+    if oci_object:
+        info["namespace"] = oci_object.namespace
+        info["bucket"] = oci_object.bucket
+        info["object_name"] = oci_object.object_name
+    if getattr(image, "url", None):
         info["url"] = {"scheme": "https", "host": "", "path": ""}
     return info
 

@@ -10,7 +10,8 @@ import os
 import shlex
 from dataclasses import dataclass
 
-from oracle_mcp_common import AuthOptions, AuthType, build_auth_context
+import oci
+from oracle_mcp_common import AuthOptions, AuthType, build_auth_context, resolve_config_file
 
 from .. import __project__, __version__
 from ..config.consts import DEFAULT_SESSION_AUTH_COMMAND, SESSION_AUTH_COMMAND_ENV
@@ -71,6 +72,8 @@ def session_auth_command(context: SessionAuthContext) -> str:
         "--region",
         region,
     ]
+    if os.getenv("OCI_CONFIG_FILE"):
+        parts.extend(["--config-file", resolve_config_file()])
     return " ".join(shlex.quote(part) for part in parts)
 
 
@@ -85,7 +88,9 @@ def session_auth_error_from_service_error(
 
     resolved_config = None if profile else get_resolved_config()
     selected_profile = profile or resolved_config.profile
-    selected_region = region or resolved_config.region
+    selected_region = region or (
+        resolved_config.region if resolved_config else _profile_region(selected_profile)
+    )
     context = SessionAuthContext(profile=selected_profile, region=selected_region)
     return _session_auth_error(
         context,
@@ -109,3 +114,16 @@ def _is_auth_failure(exc: Exception) -> bool:
         getattr(exc, "status", None) == 401
         or getattr(exc, "code", None) == "NotAuthenticated"
     )
+
+
+def _profile_region(profile: str) -> str | None:
+    """Read a selected profile's region only for session-repair guidance."""
+    try:
+        config = oci.config.from_file(
+            file_location=resolve_config_file(),
+            profile_name=profile,
+        )
+    except Exception:
+        return None
+    region = config.get("region")
+    return str(region) if region else None
