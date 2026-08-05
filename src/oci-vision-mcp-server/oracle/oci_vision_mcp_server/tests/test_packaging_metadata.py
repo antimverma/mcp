@@ -21,10 +21,10 @@ def test_package_exposes_public_oracle_entrypoint() -> None:
     assert data["project"]["requires-python"] == ">=3.13"
     assert data["project"]["license"] == "UPL-1.0"
     assert data["project"]["license-files"] == ["LICENSE.txt"]
-    assert "fastmcp==3.4.2" in data["project"]["dependencies"]
-    assert "oci==2.179.0" in data["project"]["dependencies"]
-    assert "pydantic==2.12.3" in data["project"]["dependencies"]
-    assert "mcp>=1.27.0" in data["project"]["dependencies"]
+    assert "fastmcp==3.4.5" in data["project"]["dependencies"]
+    assert "oci==2.182.1" in data["project"]["dependencies"]
+    assert "pydantic>=2.13.4" in data["project"]["dependencies"]
+    assert "mcp>=1.29.0,<2.0.0" in data["project"]["dependencies"]
     assert scripts["oracle.oci-vision-mcp-server"] == "oracle.oci_vision_mcp_server.server:main"
     assert "oci-vision-mcp-server" not in scripts
     assert "oci-vision-mcp-server-launcher" not in scripts

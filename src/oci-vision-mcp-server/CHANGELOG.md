@@ -10,7 +10,7 @@
 
 ### Changed
 
-- Updated runtime dependencies to FastMCP 3.4.2, OCI SDK 2.179.0, and Pydantic 2.12.3.
+- Updated runtime dependencies to FastMCP 3.4.5, MCP 1.29+, OCI SDK 2.182.1, and Pydantic 2.13.4+.
 - Disabled browser-based session authentication by default; it remains available by setting `OCI_MCP_AUTO_AUTH=true`.
 - Use the shared `oracle-mcp-common` authentication context for OCI Vision and Object Storage clients.
 - Default the OCI profile to `DEFAULT` and defer Vision compartment validation until a Vision operation requires it.
