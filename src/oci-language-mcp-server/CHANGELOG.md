@@ -4,6 +4,17 @@ All notable changes are documented here. Versions follow Semantic Versioning.
 
 ## Unreleased
 
+### Security
+
+- Restrict tool-selected regions to recognized OCI region identifiers, disable OCI SDK request
+  logging, and prevent unauthenticated local HTTP listeners in the container image.
+
+### Fixed
+
+- Preserve OCI PII REMOVE output formatting, reconcile malformed batch response keys, and support
+  `chars_to_consider=0`.
+- Make the container healthcheck transport-aware.
+
 ### Added
 
 - Initial generic OCI Language MCP server.

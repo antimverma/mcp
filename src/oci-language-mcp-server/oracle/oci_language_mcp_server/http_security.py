@@ -61,7 +61,15 @@ class HttpSecurityMiddleware:
                 if not hmac.compare_digest(authorization, expected):
                     await self._reject(scope, receive, send, 401, "Authentication required.")
                     return
-            if authorization and not await self._within_rate_limit():
+            # OAuth credentials are verified by FastMCP after this boundary.  Charging
+            # here would let arbitrary invalid bearer values exhaust the valid-client
+            # quota. Token-file credentials are verified above, so they are safe to
+            # charge at this point.
+            if (
+                self.settings.http_auth_mode == "token-file"
+                and authorization
+                and not await self._within_rate_limit()
+            ):
                 await self._reject(scope, receive, send, 429, "Request rate limit exceeded.")
                 return
 

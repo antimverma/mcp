@@ -92,21 +92,26 @@ Create or refresh a temporary local identity with `oci session authenticate`. Se
 reads the standard OCI config and security-token files; credentials are never configured as
 MCP arguments.
 
-## Local Docker and Streamable HTTP
+## Containerized stdio and secured Streamable HTTP
 
-From the root of the `oracle/mcp` repository, build the image with the shared
-authentication workspace included:
+From the server directory, build the image:
 
 ```bash
-docker build -f src/oci-language-mcp-server/Containerfile -t oci-language-mcp:0.1.0 .
+cd src/oci-language-mcp-server
+docker build -t oci-language-mcp:0.1.0 .
 
 docker run --rm -p 127.0.0.1:8080:8080 \
   --read-only --cap-drop=ALL --security-opt=no-new-privileges \
   --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m \
   -v "$HOME/.oci:/app/.oci:ro" \
   -v "$HOME/.oci:$HOME/.oci:ro" \
+  -v "$(pwd)/mcp-token:/run/secrets/mcp-token:ro" \
   -e LANGUAGE_MCP_TRANSPORT=streamable-http \
-  -e LANGUAGE_MCP_DEPLOYMENT_MODE=local \
+  -e LANGUAGE_MCP_DEPLOYMENT_MODE=remote \
+  -e LANGUAGE_MCP_HOST=0.0.0.0 \
+  -e LANGUAGE_MCP_ALLOWED_HOSTS=localhost \
+  -e LANGUAGE_MCP_ALLOWED_ORIGINS=http://localhost \
+  -e LANGUAGE_MCP_AUTH_TOKEN_FILE=/run/secrets/mcp-token \
   -e LANGUAGE_MCP_OCI_AUTH_MODE=session \
   -e LANGUAGE_MCP_OCI_CONFIG_FILE=/app/.oci/config \
   -e LANGUAGE_MCP_REGION=us-ashburn-1 \
@@ -114,9 +119,9 @@ docker run --rm -p 127.0.0.1:8080:8080 \
   oci-language-mcp:0.1.0
 ```
 
-The Oracle Linux container runs as a non-root `oracle` user. The command above applies a
-read-only filesystem, drops Linux capabilities, prevents privilege escalation, and mounts the
-host OCI configuration read-only. The service is published on loopback by default:
+The image defaults to stdio. The command above explicitly enables secured remote HTTP, applies a
+read-only filesystem, drops Linux capabilities, prevents privilege escalation, and mounts both
+the host OCI configuration and a bearer token read-only. The published host port stays loopback:
 
 ```json
 {
@@ -133,7 +138,8 @@ host OCI configuration read-only. The service is published on loopback by defaul
 
 Liveness is `GET /health`; readiness is `GET /ready`.
 Readiness reports available local request capacity; it does not make an OCI credential or
-service-availability probe.
+service-availability probe. For remote HTTP health checks, set
+`LANGUAGE_MCP_HEALTHCHECK_HOST` to a value in `LANGUAGE_MCP_ALLOWED_HOSTS`.
 
 For containerized stdio:
 

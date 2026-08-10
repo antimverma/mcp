@@ -12,6 +12,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 from fastmcp import FastMCP
+from fastmcp.server.middleware.rate_limiting import SlidingWindowRateLimitingMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
@@ -46,12 +47,24 @@ def create_server(
         finally:
             service.shutdown()
 
+    mcp_middleware = [ArgumentSanitizationMiddleware(), SafeTelemetryMiddleware()]
+    # FastMCP applies this middleware only after its configured auth provider has
+    # accepted the request. This keeps invalid OAuth tokens out of the authenticated
+    # request quota while preserving a limit for successful remote MCP requests.
+    if settings.deployment_mode == "remote" and settings.http_auth_mode == "oauth":
+        mcp_middleware.append(
+            SlidingWindowRateLimitingMiddleware(
+                max_requests=settings.remote_requests_per_minute,
+                window_minutes=1,
+            )
+        )
+
     mcp_server = FastMCP(
         name=settings.server_name,
         version=__version__,
         instructions=load_instructions(),
         auth=build_mcp_auth(settings),
-        middleware=[ArgumentSanitizationMiddleware(), SafeTelemetryMiddleware()],
+        middleware=mcp_middleware,
         lifespan=lifespan,
         mask_error_details=True,
         strict_input_validation=False,

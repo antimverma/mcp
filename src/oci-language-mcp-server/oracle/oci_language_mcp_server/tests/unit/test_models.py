@@ -104,11 +104,29 @@ def test_pii_request_accepts_clean_masking_contract() -> None:
     )
     assert request.masking is not None
     assert request.masking["EMAIL"].exclude_offsets == [6]
+    assert DetectPiiEntitiesRequest(
+        documents=[{"key": "one", "text": "hello"}], masking={}
+    ).masking is None
+    assert DetectPiiEntitiesRequest(documents=[{"key": "one", "text": "hello"}]).masking is None
+    assert DetectPiiEntitiesRequest(
+        documents=[{"key": "one", "text": "hello"}], masking=None
+    ).masking is None
     with pytest.raises(ValidationError, match="ALL cannot"):
         DetectPiiEntitiesRequest(
             documents=[{"key": "one", "text": "hello"}],
             masking={"ALL": {"mode": "MASK"}, "EMAIL": {"mode": "REMOVE"}},
         )
+
+
+def test_options_reject_untrusted_regions_and_allow_all_characters() -> None:
+    assert DetectDominantLanguageRequest(
+        documents=[{"key": "one", "text": "hello"}], chars_to_consider=0
+    ).chars_to_consider == 0
+    for region in ("attacker.example", "user@attacker", "127.0.0.1", "us-ashburn-1:443"):
+        with pytest.raises(ValidationError, match="recognized OCI region"):
+            DetectDominantLanguageRequest(
+                documents=[{"key": "one", "text": "hello"}], options={"region": region}
+            )
 
 
 def test_sentiment_levels_are_optional_strict_and_unique() -> None:

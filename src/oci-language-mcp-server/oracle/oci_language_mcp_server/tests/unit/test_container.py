@@ -1,0 +1,15 @@
+# Copyright (c) 2026, Oracle and/or its affiliates.
+# Licensed under the Universal Permissive License v1.0 as shown at
+# https://oss.oracle.com/licenses/upl.
+
+from __future__ import annotations
+
+from pathlib import Path
+
+
+def test_container_defaults_to_safe_stdio_configuration() -> None:
+    containerfile = Path(__file__).parents[4] / "Containerfile"
+    content = containerfile.read_text(encoding="utf-8")
+    assert "LANGUAGE_MCP_TRANSPORT=stdio" in content
+    assert "LANGUAGE_MCP_HOST=127.0.0.1" in content
+    assert "LANGUAGE_MCP_HEALTHCHECK_HOST" in content

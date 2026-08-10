@@ -20,7 +20,6 @@ from .models import (
     BaseToolResult,
     DetectPiiEntitiesRequest,
     DocumentError,
-    RemoveRule,
     ResultSummary,
 )
 
@@ -54,8 +53,38 @@ def parse_oci_response(
     submitted = len(request.documents)
     data = getattr(response, "data", response)
     payload = oci.util.to_dict(data) if data is not None else {}
-    documents = [_parse_document(tool, item, request) for item in payload.get("documents") or []]
-    errors = [_parse_document_error(tool, item) for item in payload.get("errors") or []]
+    raw_documents = payload.get("documents") or []
+    raw_errors = payload.get("errors") or []
+    submitted_keys = {document.key for document in request.documents}
+    response_keys = [_value(item, "key") for item in [*raw_documents, *raw_errors]]
+    if (
+        any(not isinstance(key, str) or key not in submitted_keys for key in response_keys)
+        or len(response_keys) != len(set(response_keys))
+    ):
+        documents = []
+        errors = [
+            DocumentError(
+                key=document.key,
+                code="UPSTREAM_INVALID_RESPONSE",
+                message="OCI Language returned inconsistent document result keys.",
+                retryable=True,
+            )
+            for document in request.documents
+        ]
+    else:
+        documents = [_parse_document(tool, item, request) for item in raw_documents]
+        errors = [_parse_document_error(tool, item) for item in raw_errors]
+        returned_keys = set(response_keys)
+        errors.extend(
+            DocumentError(
+                key=document.key,
+                code="UPSTREAM_MISSING_RESULT",
+                message="OCI Language returned no result for this document.",
+                retryable=True,
+            )
+            for document in request.documents
+            if document.key not in returned_keys
+        )
     if not documents and not errors and submitted:
         errors = [
             DocumentError(
@@ -226,14 +255,6 @@ def _parse_document(tool: str, item: dict[str, Any], request: AnyToolRequest) ->
         assert isinstance(request, DetectPiiEntitiesRequest)
         include_text = request.masking is None or request.options.include_original_entity_text
         masked_text = _value(item, "masked_text", "maskedText")
-        if request.masking and any(
-            isinstance(rule, RemoveRule) for rule in request.masking.values()
-        ):
-            masked_text = (
-                _normalize_removed_text(masked_text)
-                if isinstance(masked_text, str)
-                else masked_text
-            )
         return {
             **common,
             "language_code": str(_value(item, "language_code", "languageCode") or ""),
@@ -520,15 +541,6 @@ def _quoted(value: Any) -> str:
 
 def _score(value: Any) -> str:
     return f"{float(value or 0.0):.3f}"
-
-
-def _normalize_removed_text(value: str) -> str:
-    lines = []
-    for line in value.splitlines():
-        line = re.sub(r"[ \t]+", " ", line)
-        line = re.sub(r"\s+([,.;:!?])", r"\1", line)
-        lines.append(line.strip())
-    return "\n".join(lines).strip()
 
 
 def _sentiment_span(item: dict[str, Any]) -> dict[str, Any]:

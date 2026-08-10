@@ -174,19 +174,26 @@ class LanguageService:
                 oci_request_id=extract_service_error_oci_request_id(exc),
             )
         except Exception as exc:
-            timed_out = type(exc).__name__ in {"ReadTimeout", "ConnectTimeout"}
+            timed_out = _is_timeout(exc)
+            circuit_open = _is_circuit_open(exc)
             result = failure_result(
                 tool=tool,
                 request_id=request_id,
                 client_opc_request_id=client_opc_request_id,
                 submitted=submitted,
-                code="UPSTREAM_TIMEOUT" if timed_out else "INTERNAL_ERROR",
+                code=(
+                    "UPSTREAM_TIMEOUT"
+                    if timed_out
+                    else "UPSTREAM_UNAVAILABLE"
+                    if circuit_open
+                    else "INTERNAL_ERROR"
+                ),
                 message=(
                     f"OCI Language {capability} timed out. Retry shortly."
                     if timed_out
                     else f"OCI Language {capability} failed unexpectedly."
                 ),
-                retryable=timed_out,
+                retryable=timed_out or circuit_open,
             )
         await logger.ainfo(
             "language_request_completed",
@@ -241,3 +248,26 @@ def _uses_relexify(request: AnyToolRequest) -> bool:
         and request.masking
         and any(isinstance(rule, RelexifyRule) for rule in request.masking.values())
     )
+
+
+def _exception_chain(exc: BaseException) -> tuple[BaseException, ...]:
+    """Return a bounded exception chain without following arbitrary object attributes."""
+
+    chain: list[BaseException] = []
+    current: BaseException | None = exc
+    while current is not None and len(chain) < 8 and current not in chain:
+        chain.append(current)
+        current = current.__cause__ or current.__context__
+    return tuple(chain)
+
+
+def _is_timeout(exc: BaseException) -> bool:
+    return any(
+        isinstance(item, (oci.exceptions.ConnectTimeout,))
+        or type(item).__name__ in {"ReadTimeout", "ConnectTimeout", "BaseConnectTimeout"}
+        for item in _exception_chain(exc)
+    )
+
+
+def _is_circuit_open(exc: BaseException) -> bool:
+    return any("circuit" in type(item).__name__.lower() for item in _exception_chain(exc))

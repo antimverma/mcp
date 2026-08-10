@@ -362,7 +362,7 @@ def test_pii_parser_omits_original_values_for_transformation() -> None:
                     {
                         "key": "one",
                         "language_code": "en",
-                        "masked_text": "Email  .",
+                        "masked_text": "  Heading:\n\tEmail  .  \n\tValue\t\tretained",
                         "entities": [
                             {
                                 "offset": 6,
@@ -388,7 +388,7 @@ def test_pii_parser_omits_original_values_for_transformation() -> None:
         client_opc_request_id="CLIENT",
     )
     assert result.documents[0].entities[0].text is None
-    assert result.documents[0].masked_text == "Email."
+    assert result.documents[0].masked_text == "  Heading:\n\tEmail  .  \n\tValue\t\tretained"
     assert "jane@example.com" not in str(result)
     assert "Warning: configured PII exclusions" not in result.text
 
@@ -509,6 +509,52 @@ def test_parser_marks_mixed_document_results_as_partial() -> None:
     assert result.summary.succeeded == 1
     assert result.summary.failed == 1
     assert "raw internal error" not in str(result)
+
+
+def test_parser_rejects_duplicate_or_unknown_response_keys() -> None:
+    request = REQUEST_MODELS["detect_dominant_language"].model_validate(
+        {"documents": [{"key": "one", "text": "hello"}]}
+    )
+    result = parse_oci_response(
+        SimpleNamespace(
+            headers={},
+            data={
+                "documents": [
+                    {"key": "one", "languages": []},
+                    {"key": "unknown", "languages": []},
+                ],
+                "errors": [],
+            },
+        ),
+        tool="detect_dominant_language",
+        request=request,
+        request_id="MCP",
+        client_opc_request_id="CLIENT",
+    )
+    assert result.status == "failed"
+    assert result.documents == []
+    assert result.errors[0].key == "one"
+    assert result.errors[0].code == "UPSTREAM_INVALID_RESPONSE"
+
+
+def test_parser_synthesizes_missing_document_result() -> None:
+    request = REQUEST_MODELS["detect_dominant_language"].model_validate(
+        {"documents": [{"key": "one", "text": "hello"}, {"key": "two", "text": "world"}]}
+    )
+    result = parse_oci_response(
+        SimpleNamespace(
+            headers={},
+            data={"documents": [{"key": "one", "languages": []}], "errors": []},
+        ),
+        tool="detect_dominant_language",
+        request=request,
+        request_id="MCP",
+        client_opc_request_id="CLIENT",
+    )
+    assert result.status == "partial"
+    assert result.summary.succeeded == 1
+    assert result.errors[0].key == "two"
+    assert result.errors[0].code == "UPSTREAM_MISSING_RESULT"
 
 
 def test_oci_request_id_extraction_prefers_header() -> None:

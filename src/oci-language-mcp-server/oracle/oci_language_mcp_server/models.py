@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Annotated, Any, Literal, get_args
 
+import oci
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 MAX_DOCUMENTS = 100
@@ -123,6 +124,13 @@ class ToolOptions(StrictModel):
         max_length=64,
         description="OCI region override for this call.",
     )
+
+    @field_validator("region")
+    @classmethod
+    def validate_region(cls, value: str | None) -> str | None:
+        if value is not None and not oci.regions.is_region(value):
+            raise ValueError("Region must be a recognized OCI region identifier.")
+        return value
     opc_request_id: str | None = Field(
         default=None,
         min_length=1,
@@ -169,7 +177,7 @@ class DetectDominantLanguageRequest(BatchRequest):
     )
     chars_to_consider: int | None = Field(
         default=None,
-        ge=1,
+        ge=0,
         le=MAX_DOCUMENT_CHARACTERS,
         description="Maximum leading characters OCI should consider per document.",
     )
@@ -285,6 +293,8 @@ class DetectPiiEntitiesRequest(BatchRequest):
     ) -> dict[str, MaskingRule] | None:
         if value is None:
             return value
+        if not value:
+            return None
         unknown = sorted(set(value).difference(SUPPORTED_MASKING_TARGETS))
         if unknown:
             raise ValueError(f"Unsupported PII masking target(s): {', '.join(unknown)}")

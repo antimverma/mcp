@@ -11,6 +11,7 @@ from functools import lru_cache
 from typing import Literal
 from urllib.parse import urlsplit
 
+import oci
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -80,6 +81,14 @@ class LanguageMcpSettings(BaseSettings):
             raise ValueError("Unknown enabled tool(s): " + ", ".join(unknown_tools))
         if not configured_tools:
             raise ValueError("At least one OCI Language tool must be enabled.")
+        if self.region and not oci.regions.is_region(self.region):
+            raise ValueError("LANGUAGE_MCP_REGION must be a recognized OCI region identifier.")
+        if (
+            self.transport == "streamable-http"
+            and self.deployment_mode == "local"
+            and self.host not in {"127.0.0.1", "::1", "localhost"}
+        ):
+            raise ValueError("Local Streamable HTTP must bind to a loopback host.")
         if self.deployment_mode == "remote":
             required = [
                 ("allowed_hosts", self.allowed_hosts),

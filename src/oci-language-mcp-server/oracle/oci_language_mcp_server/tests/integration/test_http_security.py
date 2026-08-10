@@ -6,10 +6,11 @@ from __future__ import annotations
 
 import pytest
 from pydantic import ValidationError
+from starlette.responses import JSONResponse
 from starlette.testclient import TestClient
 
 from oracle.oci_language_mcp_server.config import LanguageMcpSettings
-from oracle.oci_language_mcp_server.http_security import http_middleware
+from oracle.oci_language_mcp_server.http_security import HttpSecurityMiddleware, http_middleware
 from oracle.oci_language_mcp_server.server import create_server
 
 
@@ -32,6 +33,51 @@ def test_local_mode_allows_localhost_and_rejects_other_hosts_and_origins() -> No
 def test_remote_mode_requires_complete_security_configuration() -> None:
     with pytest.raises(ValidationError, match="Remote mode requires"):
         LanguageMcpSettings(deployment_mode="remote")
+
+
+def test_local_http_rejects_non_loopback_listener() -> None:
+    with pytest.raises(ValidationError, match="loopback"):
+        LanguageMcpSettings(host="0.0.0.0")
+
+
+def test_invalid_oauth_bearers_do_not_consume_the_post_auth_quota() -> None:
+    settings = LanguageMcpSettings(
+        deployment_mode="remote",
+        http_auth_mode="oauth",
+        allowed_hosts="mcp.example.test",
+        allowed_origins="https://agent.example.test",
+        public_base_url="https://mcp.example.test",
+        oauth_issuer="https://identity.example.test",
+        oauth_jwks_uri="https://identity.example.test/jwks",
+        oauth_audience="https://mcp.example.test/mcp",
+        remote_requests_per_minute=1,
+    )
+
+    async def authenticated_app(scope, receive, send) -> None:
+        if scope["type"] == "lifespan":
+            while True:
+                message = await receive()
+                event = "startup" if message["type"] == "lifespan.startup" else "shutdown"
+                await send({"type": f"lifespan.{event}.complete"})
+                if event == "shutdown":
+                    break
+            return
+        await JSONResponse({"status": "authenticated"})(scope, receive, send)
+
+    middleware = HttpSecurityMiddleware(authenticated_app, settings=settings, remote_token=None)
+
+    async def pre_auth_quota_must_not_run() -> bool:
+        raise AssertionError("OAuth quota was charged before authentication")
+
+    middleware._within_rate_limit = pre_auth_quota_must_not_run  # type: ignore[method-assign]
+    headers = {
+        "Host": "mcp.example.test",
+        "Origin": "https://agent.example.test",
+        "Authorization": "Bearer invalid-token",
+    }
+    with TestClient(middleware, base_url="https://mcp.example.test") as client:
+        assert client.post("/mcp", headers=headers, json={}).status_code == 200
+        assert client.post("/mcp", headers=headers, json={}).status_code == 200
 
 
 def test_remote_mode_requires_bearer_token_and_enforces_rate_limit(tmp_path) -> None:

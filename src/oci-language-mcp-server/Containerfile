@@ -16,27 +16,24 @@ RUN microdnf install epel-release && \
   && useradd -m -d /app oracle
 
 WORKDIR /app
-COPY --chown=oracle:oracle src/common /common
-COPY --chown=oracle:oracle src/oci-language-mcp-server /app
+COPY --chown=oracle:oracle . /app
 
 RUN pip3.13 install --no-cache-dir uv && \
-  uv --no-cache sync --locked --all-extras && \
-  chown -R oracle:oracle /app /common
+  uv --no-cache sync --locked --all-extras
 
 USER oracle
 
-ENV LANGUAGE_MCP_HOST=0.0.0.0 \
+ENV LANGUAGE_MCP_HOST=127.0.0.1 \
     LANGUAGE_MCP_PORT=8080 \
     LANGUAGE_MCP_LOG_LEVEL=INFO \
     LANGUAGE_MCP_LOG_FORMAT=json \
     LANGUAGE_MCP_DEPLOYMENT_MODE=local \
-    LANGUAGE_MCP_TRANSPORT=streamable-http \
+    LANGUAGE_MCP_TRANSPORT=stdio \
     UV_NO_SYNC=1
 
-EXPOSE 8080
 STOPSIGNAL SIGTERM
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-    CMD python3.13 -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')" || exit 1
+    CMD python3.13 -c "import os, urllib.request; transport=os.environ.get('LANGUAGE_MCP_TRANSPORT', 'stdio'); host=os.environ.get('LANGUAGE_MCP_HEALTHCHECK_HOST', 'localhost'); request=urllib.request.Request('http://127.0.0.1:'+os.environ.get('LANGUAGE_MCP_PORT', '8080')+'/health', headers={'Host': host}); exit(0) if transport == 'stdio' else urllib.request.urlopen(request, timeout=3)" || exit 1
 
 ENTRYPOINT ["uv", "run", "oracle.oci-language-mcp-server"]

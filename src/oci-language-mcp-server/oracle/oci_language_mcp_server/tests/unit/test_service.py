@@ -12,7 +12,12 @@ import pytest
 
 from oracle.oci_language_mcp_server.config import LanguageMcpSettings
 from oracle.oci_language_mcp_server.models import REQUEST_MODELS
-from oracle.oci_language_mcp_server.service import LanguageService, _public_service_error
+from oracle.oci_language_mcp_server.service import (
+    LanguageService,
+    _is_circuit_open,
+    _is_timeout,
+    _public_service_error,
+)
 
 
 class CapturingProvider:
@@ -183,6 +188,19 @@ def test_public_service_error_preserves_special_status_mappings(
     code, _message, retryable = _public_service_error(status, "translation")
     assert code == expected_code
     assert retryable is expected_retryable
+
+
+def test_timeout_and_circuit_detection_follow_safe_exception_chains() -> None:
+    class ReadTimeout(Exception):
+        pass
+
+    class CircuitBreakerOpen(Exception):
+        pass
+
+    wrapped_timeout = oci.exceptions.RequestException("request failed")
+    wrapped_timeout.__cause__ = ReadTimeout("read timed out")
+    assert _is_timeout(wrapped_timeout) is True
+    assert _is_circuit_open(CircuitBreakerOpen("open")) is True
 
 
 async def test_service_returns_invalid_request_for_unsupported_translation() -> None:

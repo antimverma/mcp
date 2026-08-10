@@ -116,7 +116,7 @@ def test_provider_maps_dominant_language_and_translation_options(monkeypatch) ->
         {
             "documents": [{"key": "one", "text": "hello"}],
             "should_ignore_transliteration": True,
-            "chars_to_consider": 4,
+            "chars_to_consider": 0,
         }
     )
     provider.detect_dominant_language(
@@ -124,7 +124,7 @@ def test_provider_maps_dominant_language_and_translation_options(monkeypatch) ->
     )
     details = client.kwargs["batch_detect_dominant_language_details"]
     assert details.should_ignore_transliteration is True
-    assert details.chars_to_consider == 4
+    assert details.chars_to_consider == 0
 
     translation = REQUEST_MODELS["translate_language_text"].model_validate(
         {
@@ -187,12 +187,19 @@ def test_provider_maps_all_pii_modes() -> None:
 
 
 @pytest.mark.parametrize("auth_mode", ["session", "instance_principal", "resource_principal"])
-def test_provider_sets_additional_user_agent_for_each_auth_mode(monkeypatch, auth_mode) -> None:
+def test_provider_sets_safe_client_configuration_for_each_auth_mode(
+    monkeypatch, capsys, auth_mode
+) -> None:
     captured: dict[str, object] = {}
+    sentinel_payload = "SENTINEL_REQUEST_TEXT"
+    sentinel_authorization = "SENTINEL_AUTHORIZATION"
 
     class CapturingLanguageClient:
         def __init__(self, **kwargs) -> None:
             captured.update(kwargs)
+            if kwargs["config"].get("log_requests"):
+                print(sentinel_payload)
+                print(sentinel_authorization, file=__import__("sys").stderr)
 
     monkeypatch.setattr(
         "oracle.oci_language_mcp_server.provider.build_auth_context",
@@ -212,3 +219,23 @@ def test_provider_sets_additional_user_agent_for_each_auth_mode(monkeypatch, aut
     OciLanguageProvider(LanguageMcpSettings(oci_auth_mode=auth_mode))._client(region=None)
 
     assert captured["config"]["additional_user_agent"] == "oci-language-mcp/0.1.0"
+    assert captured["config"]["log_requests"] is False
+    output = capsys.readouterr()
+    assert sentinel_payload not in output.out + output.err
+    assert sentinel_authorization not in output.out + output.err
+
+
+def test_provider_bounds_cached_non_session_clients(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "oracle.oci_language_mcp_server.provider.build_auth_context",
+        lambda *_args, region, **_kwargs: SimpleNamespace(
+            mode="resource_principal", region=region, config={"region": region}, signer=None
+        ),
+    )
+    monkeypatch.setattr(oci.ai_language, "AIServiceLanguageClient", lambda **_kwargs: object())
+    provider = OciLanguageProvider(LanguageMcpSettings())
+
+    for index in range(17):
+        provider._client(region=f"us-test-{index}")
+
+    assert len(provider._clients) == 16
