@@ -94,18 +94,17 @@ MCP arguments.
 
 ## Containerized stdio and secured Streamable HTTP
 
-From the server directory, build the image:
+From the repository root, build the image with the supported Podman workflow:
 
 ```bash
-cd src/oci-language-mcp-server
-docker build -t oci-language-mcp:0.1.0 .
+SUBDIRS=src/oci-language-mcp-server make containerize
 
-docker run --rm -p 127.0.0.1:8080:8080 \
+podman run --rm -p 127.0.0.1:8080:8080 \
   --read-only --cap-drop=ALL --security-opt=no-new-privileges \
   --tmpfs /tmp:rw,noexec,nosuid,nodev,size=64m \
   -v "$HOME/.oci:/app/.oci:ro" \
   -v "$HOME/.oci:$HOME/.oci:ro" \
-  -v "$(pwd)/mcp-token:/run/secrets/mcp-token:ro" \
+  -v "$HOME/.config/oci-language-mcp/mcp-token:/run/secrets/mcp-token:ro" \
   -e LANGUAGE_MCP_TRANSPORT=streamable-http \
   -e LANGUAGE_MCP_DEPLOYMENT_MODE=remote \
   -e LANGUAGE_MCP_HOST=0.0.0.0 \
@@ -116,7 +115,7 @@ docker run --rm -p 127.0.0.1:8080:8080 \
   -e LANGUAGE_MCP_OCI_CONFIG_FILE=/app/.oci/config \
   -e LANGUAGE_MCP_REGION=us-ashburn-1 \
   -e LANGUAGE_MCP_COMPARTMENT_ID=<compartment-ocid> \
-  oci-language-mcp:0.1.0
+  oracle.oci-language-mcp-server:latest
 ```
 
 The image defaults to stdio. The command above explicitly enables secured remote HTTP, applies a
@@ -144,7 +143,7 @@ service-availability probe. For remote HTTP health checks, set
 For containerized stdio:
 
 ```bash
-docker run --rm -i \
+podman run --rm -i \
   --read-only --cap-drop=ALL --security-opt=no-new-privileges \
   -v "$HOME/.oci:/app/.oci:ro" \
   -v "$HOME/.oci:$HOME/.oci:ro" \
@@ -152,7 +151,7 @@ docker run --rm -i \
   -e LANGUAGE_MCP_OCI_CONFIG_FILE=/app/.oci/config \
   -e LANGUAGE_MCP_REGION=us-ashburn-1 \
   -e LANGUAGE_MCP_COMPARTMENT_ID=<compartment-ocid> \
-  oci-language-mcp:0.1.0 --transport stdio
+  oracle.oci-language-mcp-server:latest --transport stdio
 ```
 
 The second OCI config mount preserves absolute `key_file` and `security_token_file`

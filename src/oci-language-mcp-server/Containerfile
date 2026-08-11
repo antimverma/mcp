@@ -19,7 +19,7 @@ WORKDIR /app
 COPY --chown=oracle:oracle . /app
 
 RUN pip3.13 install --no-cache-dir uv && \
-  uv --no-cache sync --locked --all-extras
+  uv --no-cache sync --no-sources --no-dev --no-editable
 
 USER oracle
 

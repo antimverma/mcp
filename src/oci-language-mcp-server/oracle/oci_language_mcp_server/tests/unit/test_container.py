@@ -13,3 +13,4 @@ def test_container_defaults_to_safe_stdio_configuration() -> None:
     assert "LANGUAGE_MCP_TRANSPORT=stdio" in content
     assert "LANGUAGE_MCP_HOST=127.0.0.1" in content
     assert "LANGUAGE_MCP_HEALTHCHECK_HOST" in content
+    assert "uv --no-cache sync --no-sources --no-dev --no-editable" in content
