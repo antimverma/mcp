@@ -16,6 +16,7 @@ All notable changes are documented here. Versions follow Semantic Versioning.
 - Make the container healthcheck transport-aware.
 - Build the production container without development workspace sources and document the
   repository-standard Podman image workflow.
+- Make the shared container target resolve package metadata without an undeclared tool.
 
 ### Added
 

@@ -25,7 +25,7 @@ and [service limits](https://docs.oracle.com/en-us/iaas/Content/language/using/m
 
 ## Requirements and IAM
 
-- Python 3.13 or Docker
+- Python 3.13 or Podman
 - An OCI region where Language is available
 - An OCI compartment and session, instance principal, or resource principal
 
