@@ -24,7 +24,6 @@ class StubOciDocumentUnderstandingProvider:
         """Returns fake extraction output shaped like the real provider payload."""
         payload: dict[str, Any] = {
             "provider": "stub",
-            "region": self.config.region,
             "requestConfigs": extraction_configs(request, self.config),
             "includeConfidence": request.options.include_confidence,
         }
@@ -61,7 +60,6 @@ class StubOciDocumentUnderstandingProvider:
         """Returns fake classification output shaped like the real provider payload."""
         payload: dict[str, Any] = {
             "provider": "stub",
-            "region": self.config.region,
             "requestConfig": classification_config(request, self.config),
             "documentTypeHint": request.document_type_hint,
             "documentType": "INVOICE",

@@ -34,25 +34,29 @@ uvx \
 
 ## Authentication
 
-The server supports OCI SDK authentication modes through `OCI_AUTH_MODE`.
+For real OCI calls, the server uses `oracle-mcp-common` to resolve OCI SDK
+authentication. Set `OCI_MCP_AUTH_TYPE` when you need a specific mode:
 
-Supported values:
+- `security_token`
+- `api_key`
+- `instance_principal`
+- `resource_principal`
+- `instance_principal_delegation`
+- `resource_principal_delegation`
+- `oke_workload_identity`
+- `identity_domain_upst`
 
-- `session-token`
-- `api-key`
-- `instance-principal`
-- `none`
+When `OCI_MCP_AUTH_TYPE` is unset, the common library's `auto` mode uses a
+security token only when the selected OCI profile directly declares
+`security_token_file`; otherwise it uses API-key authentication. Principal
+authentication modes must be selected explicitly.
 
-`none` is only for `DOCUMENT_MCP_MODE=stub`, which uses a deterministic fake
-provider and does not call OCI.
+`DOCUMENT_MCP_MODE` selects the provider, not the authentication mode:
 
-`DOCUMENT_MCP_MODE` controls the default auth mode:
-
-| `DOCUMENT_MCP_MODE` | Default `OCI_AUTH_MODE` | Description |
-| --- | --- | --- |
-| `stub` | `none` | Local MCP flow testing without OCI calls. |
-| `local` | `session-token` | Local OCI config profile with session-token auth. |
-| `prod` | `instance-principal` | OCI Compute instance principal auth. |
+| `DOCUMENT_MCP_MODE` | Description |
+| --- | --- |
+| `oci` (default) | Real OCI Document Understanding SDK provider. |
+| `stub` | Deterministic fake provider for local MCP flow testing. |
 
 For local session-token authentication, run:
 
@@ -67,18 +71,33 @@ matching session `key_file`.
 
 | Environment Variable | Required | Default | Description |
 | --- | --- | --- | --- |
-| `DOCUMENT_MCP_MODE` | No | `local` | Runtime mode: `stub`, `local`, or `prod`. |
-| `OCI_AUTH_MODE` | No | Derived from `DOCUMENT_MCP_MODE` | OCI auth mode: `session-token`, `api-key`, `instance-principal`, or `none`. |
-| `OCI_REGION` | No | `us-ashburn-1` | OCI region used for Document Understanding requests. |
+| `DOCUMENT_MCP_MODE` | No | `oci` | Provider mode: `oci` or `stub`. |
+| `OCI_MCP_AUTH_TYPE` | No | `auto` | OCI authentication type, resolved by `oracle-mcp-common`. |
+| `OCI_REGION` | Depends on auth type | Profile or signer region | OCI region, resolved by `oracle-mcp-common`. |
 | `OCI_COMPARTMENT_ID` | Yes for non-stub OCI calls | None | Default compartment OCID for Document Understanding requests. |
-| `OCI_CONFIG_PROFILE` | No | `DEFAULT` | OCI config profile name. |
-| `OCI_CONFIG_FILE` | No | OCI SDK default | OCI config file path. |
-| `OCI_DOCUMENT_ENDPOINT` | No | None | Optional Document Understanding endpoint override. |
+| `OCI_CONFIG_PROFILE` | No | `DEFAULT` | OCI config profile, resolved by `oracle-mcp-common`. |
+| `OCI_CONFIG_FILE` | No | OCI SDK default | OCI config file, resolved by `oracle-mcp-common`. |
 
 `OCI_REGION`, when set, takes precedence over the region in an OCI config
 profile. Otherwise, profile authentication uses the profile region and
-principal authentication uses the signer region, with `us-ashburn-1` as the
-server fallback.
+principal authentication uses the signer region. The OCI SDK derives the
+official Document Understanding endpoint from that resolved region.
+
+Session-token authentication with the default OCI profile:
+
+```sh
+OCI_MCP_AUTH_TYPE=security_token \
+OCI_COMPARTMENT_ID=ocid1.compartment.oc1..example \
+uv run oracle.oci-document-understanding-mcp-server
+```
+
+Instance-principal authentication:
+
+```sh
+OCI_MCP_AUTH_TYPE=instance_principal \
+OCI_COMPARTMENT_ID=ocid1.compartment.oc1..example \
+uv run oracle.oci-document-understanding-mcp-server
+```
 
 ## Tools
 
@@ -143,9 +162,7 @@ Classification input:
 Stub mode validates MCP flow without OCI credentials:
 
 ```sh
-DOCUMENT_MCP_MODE=stub \
-OCI_AUTH_MODE=none \
-uv run oracle.oci-document-understanding-mcp-server
+DOCUMENT_MCP_MODE=stub uv run oracle.oci-document-understanding-mcp-server
 ```
 
 Use the development test command below for local validation. MCP clients can run

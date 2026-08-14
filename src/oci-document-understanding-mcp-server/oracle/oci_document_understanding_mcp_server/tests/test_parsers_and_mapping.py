@@ -56,12 +56,7 @@ def test_classification_parser_handles_missing_or_unstructured_classifications()
 def test_request_mapper_redacts_inline_content_and_preserves_object_storage() -> None:
     config = OciDocumentUnderstandingConfig(
         runtime_mode="stub",
-        region="us-phoenix-1",
-        endpoint=None,
-        auth_mode="none",
         default_compartment_id="ocid1.compartment.oc1..example",
-        config_file_path=None,
-        profile="DEFAULT",
     )
     inline_source = DocumentSource(source_type="INLINE_BASE64", document="SGVsbG8=", mime_type="application/pdf")
     object_source = DocumentSource(source_type="OBJECT_STORAGE", namespace_name="ns", bucket_name="bucket", object_name="doc.pdf")

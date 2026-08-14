@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## 0.1.0
+
 ### Added
 
 - Added public Oracle MCP package layout under `oracle/oci_document_understanding_mcp_server`.
@@ -18,9 +20,3 @@
 - Honor `include_confidence=false` by omitting confidence values from extraction results.
 - Serialize and map OCI SDK response models into extraction and classification results.
 - Apply `confidence_threshold` to classification results.
-
-## 0.1.0
-
-### Added
-
-- Initial OCI Document Understanding MCP server with document extraction and classification tools.

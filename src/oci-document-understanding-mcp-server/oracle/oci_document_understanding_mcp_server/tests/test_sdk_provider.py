@@ -7,7 +7,8 @@ https://oss.oracle.com/licenses/upl.
 import sys
 from types import SimpleNamespace
 
-import oci as real_oci
+from oci import util as real_oci_util
+from oci.ai_document import models as real_ai_document_models
 import pytest
 
 from oracle.oci_document_understanding_mcp_server.models import (
@@ -30,7 +31,6 @@ class FakeClient:
         self.config = config
         self.signer = signer
         self.client_kwargs = kwargs
-        self.base_client = SimpleNamespace(set_endpoint=lambda endpoint: setattr(self, "endpoint", endpoint))
         FakeClient.created.append((config, signer))
 
     def analyze_document(self, analyze_document_details: object) -> object:
@@ -74,7 +74,7 @@ def _install_fake_oci(monkeypatch: pytest.MonkeyPatch, token_file: str) -> None:
         }
 
     def to_dict(value: object) -> object:
-        return value.payload if isinstance(value, FakeData) else real_oci.util.to_dict(value)
+        return value.payload if isinstance(value, FakeData) else real_oci_util.to_dict(value)
 
     fake_oci = SimpleNamespace(
         config=SimpleNamespace(from_file=from_file, DEFAULT_LOCATION="~/.oci/config"),
@@ -106,34 +106,34 @@ def _install_fake_oci(monkeypatch: pytest.MonkeyPatch, token_file: str) -> None:
     monkeypatch.setattr(
         sdk_provider,
         "build_auth_context",
-        lambda _options: SimpleNamespace(config={"region": "us-phoenix-1"}, signer=object()),
+        lambda: SimpleNamespace(config={"region": "us-phoenix-1"}, region="us-phoenix-1", signer=object()),
     )
 
 
-def _config(auth_mode: str, *, compartment: str | None = "ocid1.compartment.oc1..example") -> OciDocumentUnderstandingConfig:
+def _config(*, compartment: str | None = "ocid1.compartment.oc1..example") -> OciDocumentUnderstandingConfig:
     return OciDocumentUnderstandingConfig(
-        runtime_mode="local",
-        region="us-phoenix-1",
-        endpoint=None,
-        auth_mode=auth_mode,
+        runtime_mode="oci",
         default_compartment_id=compartment,
-        config_file_path=None,
-        profile="DEFAULT",
     )
 
 
 @pytest.mark.parametrize(
-    ("auth_mode", "auth_config", "expected_region"),
+    ("auth_type", "auth_config", "expected_region"),
     [
-        ("session-token", {"region": "eu-frankfurt-1"}, "eu-frankfurt-1"),
-        ("api-key", {"region": "eu-frankfurt-1"}, "eu-frankfurt-1"),
-        ("instance-principal", {"region": "uk-london-1"}, "uk-london-1"),
+        ("api_key", {"region": "eu-frankfurt-1"}, "eu-frankfurt-1"),
+        ("security_token", {"region": "eu-frankfurt-1"}, "eu-frankfurt-1"),
+        ("identity_domain_upst", {"region": "us-ashburn-1"}, "us-ashburn-1"),
+        ("instance_principal", {"region": "uk-london-1"}, "uk-london-1"),
+        ("resource_principal", {"region": "us-phoenix-1"}, "us-phoenix-1"),
+        ("instance_principal_delegation", {"region": "us-chicago-1"}, "us-chicago-1"),
+        ("resource_principal_delegation", {"region": "ca-toronto-1"}, "ca-toronto-1"),
+        ("oke_workload_identity", {"region": "ap-mumbai-1"}, "ap-mumbai-1"),
     ],
 )
-def test_sdk_provider_uses_shared_auth_and_sets_user_agent_for_auth_paths(
+def test_sdk_provider_uses_shared_auth_and_sets_user_agent_for_all_auth_contexts(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path,
-    auth_mode: str,
+    auth_type: str,
     auth_config: dict,
     expected_region: str,
 ) -> None:
@@ -141,15 +141,16 @@ def test_sdk_provider_uses_shared_auth_and_sets_user_agent_for_auth_paths(
     token_file.write_text("token", encoding="utf-8")
     _install_fake_oci(monkeypatch, str(token_file))
     signer = object()
-    options_seen = []
+    calls = 0
 
-    def fake_build_auth_context(options):
-        options_seen.append(options)
-        return SimpleNamespace(config=auth_config, signer=signer)
+    def fake_build_auth_context():
+        nonlocal calls
+        calls += 1
+        return SimpleNamespace(auth_type=auth_type, config=auth_config, region=expected_region, signer=signer)
 
     monkeypatch.setattr(sdk_provider, "build_auth_context", fake_build_auth_context)
 
-    provider = OciSdkDocumentUnderstandingProvider(_config(auth_mode))
+    provider = OciSdkDocumentUnderstandingProvider(_config())
 
     assert FakeClient.created[-1][0]["additional_user_agent"] == "oci-document-understanding-mcp/0.1.0"
     assert FakeClient.created[-1][0]["region"] == expected_region
@@ -157,34 +158,22 @@ def test_sdk_provider_uses_shared_auth_and_sets_user_agent_for_auth_paths(
     assert provider.client.client_kwargs["retry_strategy"] is not None
     assert provider.client.client_kwargs["circuit_breaker_strategy"] is not None
     assert callable(provider.client.client_kwargs["circuit_breaker_callback"])
-    assert options_seen[-1].auth_type == auth_mode
-    assert options_seen[-1].region is None
+    assert calls == 1
 
 
-def test_sdk_provider_uses_server_region_only_when_common_auth_has_none(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+def test_sdk_provider_requires_region_from_common_auth(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
     token_file = tmp_path / "token"
     token_file.write_text("token", encoding="utf-8")
     _install_fake_oci(monkeypatch, str(token_file))
     monkeypatch.setattr(
         sdk_provider,
         "build_auth_context",
-        lambda _options: SimpleNamespace(config={}, signer=object()),
+        lambda: SimpleNamespace(config={}, region=None, signer=object()),
     )
 
-    OciSdkDocumentUnderstandingProvider(_config("instance-principal"))
+    with pytest.raises(RuntimeError, match="OCI region is required"):
+        OciSdkDocumentUnderstandingProvider(_config())
 
-    assert FakeClient.created[-1][0]["region"] == "us-phoenix-1"
-
-
-def test_sdk_provider_uses_configured_endpoint(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
-    token_file = tmp_path / "token"
-    token_file.write_text("token", encoding="utf-8")
-    _install_fake_oci(monkeypatch, str(token_file))
-    config = _config("api-key").model_copy(update={"endpoint": "https://document.example.test"})
-
-    provider = OciSdkDocumentUnderstandingProvider(config)
-
-    assert provider.client.endpoint == "https://document.example.test"
 
 
 def test_sdk_provider_removes_confidence_when_requested(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
@@ -194,7 +183,7 @@ def test_sdk_provider_removes_confidence_when_requested(monkeypatch: pytest.Monk
     monkeypatch.setattr(
         sdk_provider,
         "build_auth_context",
-        lambda _options: SimpleNamespace(config={"region": "us-phoenix-1"}, signer=object()),
+        lambda: SimpleNamespace(config={"region": "us-phoenix-1"}, region="us-phoenix-1", signer=object()),
     )
     FakeClient.responses.append(
         SimpleNamespace(
@@ -202,7 +191,7 @@ def test_sdk_provider_removes_confidence_when_requested(monkeypatch: pytest.Monk
             headers={"opc-request-id": "extract-request"},
         )
     )
-    provider = OciSdkDocumentUnderstandingProvider(_config("api-key"))
+    provider = OciSdkDocumentUnderstandingProvider(_config())
 
     result = provider.extract(
         ExtractionRequest(
@@ -221,13 +210,13 @@ def test_sdk_provider_serializes_real_oci_sdk_result_model(monkeypatch: pytest.M
     _install_fake_oci(monkeypatch, str(token_file))
     FakeClient.responses.append(
         SimpleNamespace(
-            data=real_oci.ai_document.models.AnalyzeDocumentResult(
-                pages=[real_oci.ai_document.models.Page(page_number=1, lines=[real_oci.ai_document.models.Line(text="hello", confidence=0.9)])]
+            data=real_ai_document_models.AnalyzeDocumentResult(
+                pages=[real_ai_document_models.Page(page_number=1, lines=[real_ai_document_models.Line(text="hello", confidence=0.9)])]
             ),
             headers={"opc-request-id": "extract-request"},
         )
     )
-    provider = OciSdkDocumentUnderstandingProvider(_config("api-key"))
+    provider = OciSdkDocumentUnderstandingProvider(_config())
 
     result = provider.extract(
         ExtractionRequest(
@@ -244,7 +233,7 @@ def test_sdk_provider_requires_compartment_before_building_request(monkeypatch: 
     token_file = tmp_path / "token"
     token_file.write_text("token", encoding="utf-8")
     _install_fake_oci(monkeypatch, str(token_file))
-    provider = OciSdkDocumentUnderstandingProvider(_config("api-key", compartment=None))
+    provider = OciSdkDocumentUnderstandingProvider(_config(compartment=None))
     request = ExtractionRequest(
         document_source=DocumentSource(source_type="INLINE_BASE64", document="SGVsbG8=", mime_type="application/pdf"),
         features=["TEXT"],
@@ -265,7 +254,7 @@ def test_sdk_provider_extract_and_classify_build_oci_requests(monkeypatch: pytes
             SimpleNamespace(data={"classifications": [{"label": "INVOICE", "confidence": 0.9}]}, headers={"Opc-Request-Id": "classify-request"}),
         ]
     )
-    provider = OciSdkDocumentUnderstandingProvider(_config("api-key"))
+    provider = OciSdkDocumentUnderstandingProvider(_config())
     inline_request = ExtractionRequest(
         document_source=DocumentSource(source_type="INLINE_BASE64", document="SGVsbG8=", mime_type="application/pdf", page_range=["1"]),
         features=["TEXT", "KEY_VALUE"],
@@ -292,7 +281,7 @@ def test_sdk_provider_helpers_cover_fallback_paths(monkeypatch: pytest.MonkeyPat
     token_file = tmp_path / "token"
     token_file.write_text("token", encoding="utf-8")
     _install_fake_oci(monkeypatch, str(token_file))
-    provider = OciSdkDocumentUnderstandingProvider(_config("api-key"))
+    provider = OciSdkDocumentUnderstandingProvider(_config())
 
     assert provider._response_to_payload(SimpleNamespace(data=object()))["raw"].startswith("<object")
     assert provider._request_id(SimpleNamespace(headers={})) == "unknown"

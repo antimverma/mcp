@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 import logging
 from typing import Any
 
-from oracle_mcp_common import AuthOptions, build_auth_context
+from oracle_mcp_common import build_auth_context
 
 from oracle.oci_document_understanding_mcp_server import __project__, __version__
 from oracle.oci_document_understanding_mcp_server.models import ClassificationRequest, DocumentSource, ExtractionRequest, RawOciDocumentResult
@@ -62,19 +62,12 @@ class OciSdkDocumentUnderstandingProvider:
         try:
             import oci
         except ImportError as exc:
-            raise RuntimeError("oci Python SDK is required for local/prod modes. Install with: pip install -e .") from exc
+            raise RuntimeError("oci Python SDK is required for OCI mode. Install with: pip install -e .") from exc
 
-        auth_context = build_auth_context(
-            AuthOptions(
-                auth_type=self.config.auth_mode,
-                config_file=self.config.config_file_path,
-                profile_name=self.config.profile,
-            )
-        )
+        auth_context = build_auth_context()
+        if not auth_context.region:
+            raise RuntimeError("OCI region is required. Set OCI_REGION or configure a region in the selected OCI profile.")
         client_config = {**auth_context.config, "additional_user_agent": _ADDITIONAL_UA}
-        # oracle-mcp-common resolves OCI_REGION, then the profile or signer
-        # region. Preserve this server's documented IAD value only as a final fallback.
-        client_config.setdefault("region", self.config.region)
         client = oci.ai_document.AIServiceDocumentClient(
             client_config,
             signer=auth_context.signer,
@@ -82,9 +75,6 @@ class OciSdkDocumentUnderstandingProvider:
             circuit_breaker_strategy=oci.circuit_breaker.CircuitBreakerStrategy(),
             circuit_breaker_callback=lambda error: logger.warning("OCI Document Understanding circuit breaker triggered: %s", error),
         )
-        if self.config.endpoint:
-            client.base_client.set_endpoint(self.config.endpoint)
-
         return oci, client
 
     def _analyze_document(self, request: ExtractionRequest | ClassificationRequest, operation: str, feature_types: list[str]) -> Any:

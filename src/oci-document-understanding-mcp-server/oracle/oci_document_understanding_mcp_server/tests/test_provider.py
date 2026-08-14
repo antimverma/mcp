@@ -19,12 +19,7 @@ from oracle.oci_document_understanding_mcp_server.oci.stub_provider import StubO
 def _config() -> OciDocumentUnderstandingConfig:
     return OciDocumentUnderstandingConfig(
         runtime_mode="stub",
-        region="us-phoenix-1",
-        endpoint=None,
-        auth_mode="none",
         default_compartment_id=None,
-        config_file_path=None,
-        profile="DEFAULT",
     )
 
 
