@@ -15,7 +15,6 @@ import oci
 from mcp.types import CallToolResult, TextContent
 from pydantic import Field
 
-from ...authentication.auth import ensure_session_auth
 from ...authentication.session_signer import SessionAuthenticationError
 from ...config.consts import (
     DEFAULT_ALLOWED_EXTENSIONS,
@@ -155,7 +154,6 @@ def _run_single_fetch(
         destination_path=args.destination_path,
     )
 
-    ensure_session_auth()
     client = create_object_storage_client(
         profile=resolved_config.profile,
         region=args.options.region or resolved_config.region,
@@ -256,7 +254,6 @@ def _run_bulk_fetch(
         destination_dir=args.destination_dir,
     )
 
-    ensure_session_auth()
     client = create_object_storage_client(
         profile=resolved_config.profile,
         region=args.options.region or resolved_config.region,

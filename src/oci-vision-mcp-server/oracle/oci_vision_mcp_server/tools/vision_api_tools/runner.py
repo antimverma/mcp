@@ -11,7 +11,6 @@ from typing import Any, Callable
 import oci
 from mcp.types import CallToolResult, TextContent
 
-from ...authentication.auth import ensure_session_auth
 from ...config.consts import (
     FEATURE_FACE_DETECTION,
     FEATURE_IMAGE_CLASSIFICATION,
@@ -108,7 +107,6 @@ def run_vision_tool(
         image_details = resolver.resolve(args.image)
         resolved_image_info = resolver.image_info(args.image)
         feature = feature_factory(args)
-        ensure_session_auth()
         client = create_vision_client(
             profile=resolved_config.profile,
             region=args.options.region or resolved_config.region,
@@ -205,7 +203,6 @@ def run_analyze_image_tool(raw_args: dict[str, Any], *, tool: str) -> CallToolRe
             should_return_landmarks=args.should_return_landmarks,
         )
         feature_types = feature_types_from_names(args.features)
-        ensure_session_auth()
         client = create_vision_client(
             profile=resolved_config.profile,
             region=args.options.region or resolved_config.region,
@@ -313,7 +310,6 @@ def run_create_image_job_tool(raw_args: dict[str, Any], *, tool: str) -> CallToo
                 "create_image_job request body exceeds OCI Vision's 500 KB limit. "
                 "Use fewer objects or shorter namespace, bucket, and object names."
             )
-        ensure_session_auth()
         client = create_vision_client(
             profile=resolved_config.profile,
             region=args.options.region or resolved_config.region,
@@ -470,7 +466,6 @@ def _run_image_job_lookup_tool(
         resolved_config = get_resolved_config(persist_generated_profile=True)
         detail, option_warnings = args.options.effective_detail(ResponseDetail(resolved_config.default_detail))
         client_request_id = args.options.request_id
-        ensure_session_auth()
         client = create_vision_client(
             profile=resolved_config.profile,
             region=args.options.region or resolved_config.region,

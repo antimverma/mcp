@@ -15,7 +15,6 @@ import oci
 from mcp.types import CallToolResult
 from pydantic import Field
 
-from ...authentication.auth import ensure_session_auth
 from ...authentication.session_signer import SessionAuthenticationError
 from ...config.consts import (
     FEATURE_TEXT_DETECTION,
@@ -108,8 +107,6 @@ def run_parallel_analyze_image_tool(
             ResponseDetail(resolved_config.default_detail)
         )
         region = args.options.region or resolved_config.region
-        ensure_session_auth()
-
         item_results = _run_items_concurrently(
             args=args,
             resolved_config=resolved_config,

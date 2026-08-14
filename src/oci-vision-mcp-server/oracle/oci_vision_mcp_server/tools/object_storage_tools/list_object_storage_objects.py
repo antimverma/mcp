@@ -9,7 +9,6 @@ from __future__ import annotations
 import oci
 from mcp.types import CallToolResult, TextContent
 
-from ...authentication.auth import ensure_session_auth
 from ...config.consts import (
     MAX_OBJECT_STORAGE_LIST_SCAN_PAGES,
     TOOL_LIST_OBJECT_STORAGE_OBJECTS,
@@ -100,7 +99,6 @@ def run_list_objects_tool(raw_args: dict[str, object]) -> CallToolResult:
         prefix = args.prefix
         fields = args.fields or DEFAULT_OBJECT_STORAGE_LIST_FIELDS
 
-        ensure_session_auth()
         client = create_object_storage_client(
             profile=resolved_config.profile,
             region=args.options.region or resolved_config.region,

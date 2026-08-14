@@ -27,7 +27,6 @@ def _mock_list_runtime(monkeypatch, *, object_count: int, prefixes: list[str] | 
     monkeypatch.setenv("OCI_OBJECT_STORAGE_NAMESPACE", "namespace")
     monkeypatch.setenv("OCI_OBJECT_STORAGE_BUCKET", "bucket")
     monkeypatch.setattr(list_tool, "generate_request_id", lambda: "LIST_REQ")
-    monkeypatch.setattr(list_tool, "ensure_session_auth", lambda: None)
     monkeypatch.setattr(list_tool, "create_object_storage_client", lambda **_kwargs: object())
 
     def fake_list(*_args, **kwargs):
@@ -140,7 +139,6 @@ def test_prefix_only_listing_stops_at_bounded_prefix_window(monkeypatch) -> None
     monkeypatch.setenv("OCI_OBJECT_STORAGE_NAMESPACE", "namespace")
     monkeypatch.setenv("OCI_OBJECT_STORAGE_BUCKET", "bucket")
     monkeypatch.setattr(list_tool, "generate_request_id", lambda: "LIST_REQ")
-    monkeypatch.setattr(list_tool, "ensure_session_auth", lambda: None)
     monkeypatch.setattr(list_tool, "create_object_storage_client", lambda **_kwargs: object())
 
     def fake_list(*_args, **kwargs):
@@ -173,7 +171,6 @@ def test_prefix_overflow_does_not_hide_later_objects(monkeypatch) -> None:
     monkeypatch.setenv("OCI_OBJECT_STORAGE_NAMESPACE", "namespace")
     monkeypatch.setenv("OCI_OBJECT_STORAGE_BUCKET", "bucket")
     monkeypatch.setattr(list_tool, "generate_request_id", lambda: "LIST_REQ")
-    monkeypatch.setattr(list_tool, "ensure_session_auth", lambda: None)
     monkeypatch.setattr(list_tool, "create_object_storage_client", lambda **_kwargs: object())
 
     def fake_list(*_args, **kwargs):
@@ -214,7 +211,6 @@ def test_scan_budget_reports_unknown_has_more_instead_of_false_exhaustion(
     monkeypatch.setenv("OCI_OBJECT_STORAGE_NAMESPACE", "namespace")
     monkeypatch.setenv("OCI_OBJECT_STORAGE_BUCKET", "bucket")
     monkeypatch.setattr(list_tool, "generate_request_id", lambda: "LIST_REQ")
-    monkeypatch.setattr(list_tool, "ensure_session_auth", lambda: None)
     monkeypatch.setattr(list_tool, "create_object_storage_client", lambda **_kwargs: object())
 
     def fake_list(*_args, **kwargs):

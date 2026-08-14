@@ -9,13 +9,8 @@ from __future__ import annotations
 from pathlib import Path
 
 DEFAULT_RUNTIME_DIR = Path.home() / ".oci-vision-mcp"
-DEFAULT_SESSION_AUTH_COMMAND = "oci"
-SESSION_AUTH_COMMAND_ENV = "OCI_SESSION_AUTH_COMMAND"
 # OCI Vision image analysis accepts JPEG and PNG inputs up to 5 MiB.
 DEFAULT_MAX_IMAGE_BYTES = 5 * 1024 * 1024
-DEFAULT_REFRESH_SESSION = True
-DEFAULT_AUTO_AUTH = False
-DEFAULT_EXPIRY_SKEW_SECONDS = 300
 DEFAULT_RESULT_TTL_SECONDS = 7 * 24 * 60 * 60
 DEFAULT_MAX_INLINE_RESPONSE_BYTES = 20_000
 DEFAULT_DETAIL = "summary"

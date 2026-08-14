@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## 0.1.0
 
 ### Added
 
@@ -11,7 +11,6 @@
 ### Changed
 
 - Updated runtime dependencies to FastMCP 3.4.5, MCP 1.29+, OCI SDK 2.182.1, and Pydantic 2.13.4+.
-- Disabled browser-based session authentication by default; it remains available by setting `OCI_MCP_AUTO_AUTH=true`.
 - Use the shared `oracle-mcp-common` authentication context for OCI Vision and Object Storage clients.
 - Default the OCI profile to `DEFAULT` and defer Vision compartment validation until a Vision operation requires it.
 - Restrict Vision image inputs to OCI-supported JPEG/PNG images no larger than 5 MiB.
@@ -20,13 +19,6 @@
 ### Fixed
 
 - Include image-validation and Object Storage download code in the coverage gate.
-- Honor `OCI_CONFIG_FILE` during session-token validation and refresh checks.
 - Preserve the selected profile's configured region when handling an OCI session-authentication failure.
-- Use `OCI_CONFIG_FILE` consistently for OCI CLI session repair: `--config-file` for refresh and `--config-location` for authentication.
-- Correct the refresh-session and auto-auth configuration catalog defaults.
-
-## 0.1.0
-
-### Added
-
-- Initial OCI Vision MCP server with Vision analysis, Object Storage upload/list, result lookup, and configuration status tools.
+- Keep OCI session authentication outside the server process; the server no longer invokes the OCI CLI or starts browser-based authentication.
+- Include the configured OCI config-file path in the manual session-authentication recovery guidance.

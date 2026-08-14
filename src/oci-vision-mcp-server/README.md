@@ -43,14 +43,19 @@ will not provide `compartment_id` in individual Vision tool calls:
 OCI_VISION_DEFAULT_COMPARTMENT_ID=ocid1.compartment.oc1..example
 ```
 
-If the session token is missing or expired, refresh it with:
+If the session token is missing or expired, authenticate or refresh it outside
+the server process:
 
 ```sh
 oci session authenticate --profile-name DEFAULT --region us-phoenix-1
 ```
 
-Automatic browser-based authentication is disabled by default. To opt in for
-local interactive use, set `OCI_MCP_AUTO_AUTH=true`.
+The server never invokes the OCI CLI or opens an interactive browser. If you
+use a non-default OCI configuration file, add its path to the command:
+
+```sh
+oci session authenticate --config-location /path/to/config --profile-name DEFAULT --region us-phoenix-1
+```
 
 ## Tools
 
@@ -82,9 +87,6 @@ local interactive use, set `OCI_MCP_AUTO_AUTH=true`.
 | `MCP_IMAGE_BASE_DIR` | No | Current working directory | Base directory used to validate local `file_path` image inputs. Vision analysis accepts JPEG/PNG inputs up to 5 MiB. |
 | `OCI_VISION_RESULT_STORE_DIR` | No | `~/.oci-vision-mcp/results` | Directory for raw OCI result metadata. |
 | `OCI_VISION_LOG_DIR` | No | `~/.oci-vision-mcp/logs` | Directory reserved for MCP diagnostic logs. |
-| `OCI_MCP_AUTO_AUTH` | No | `false` | Opt-in browser-based session authentication. |
-| `OCI_MCP_REFRESH_SESSION` | No | `true` | Retry once after refreshing an expired session token. |
-| `OCI_SESSION_AUTH_COMMAND` | No | `oci` | Executable used for `oci session authenticate`. |
 | `OCI_OBJECT_STORAGE_NAMESPACE` | No | None | Default namespace for Object Storage tools and image-job output. |
 | `OCI_OBJECT_STORAGE_BUCKET` | No | None | Default bucket for Object Storage tools and image-job output. |
 | `OCI_OBJECT_STORAGE_DOWNLOAD_DIR` | No | `~/.oci-vision-mcp/obj_results` | Local directory used by `fetch_object_storage_object`. |

@@ -6,14 +6,11 @@ https://oss.oracle.com/licenses/upl.
 
 from __future__ import annotations
 
-import base64
-import json
 from types import SimpleNamespace
 
 import oci
 import pytest
 
-from oracle.oci_vision_mcp_server.authentication import auth
 from oracle.oci_vision_mcp_server.authentication.session_signer import (
     session_auth_error_from_service_error,
 )
@@ -43,69 +40,6 @@ from oracle.oci_vision_mcp_server.tools.vision_api_tools import analyze_image as
 from oracle.oci_vision_mcp_server.tools.vision_api_tools import image_jobs
 from oracle.oci_vision_mcp_server.tools.vision_api_tools import parallel_analyze_image as parallel_tool
 from oracle.oci_vision_mcp_server.tools.vision_api_tools import runner
-
-
-def _jwt(payload: dict) -> str:
-    encoded = base64.urlsafe_b64encode(json.dumps(payload).encode("utf-8")).decode("ascii").rstrip("=")
-    return f"header.{encoded}.signature"
-
-
-def test_auth_helpers_cover_invalid_tokens_and_missing_config(monkeypatch, tmp_path) -> None:
-    missing = auth.SessionConfig(profile="DEFAULT", region="us-ashburn-1", security_token_file=None)
-    absent = auth.SessionConfig(profile="DEFAULT", region="us-ashburn-1", security_token_file=str(tmp_path / "token"))
-    malformed = tmp_path / "malformed"
-    malformed.write_text("not-a-jwt", encoding="utf-8")
-    no_exp = tmp_path / "no-exp"
-    no_exp.write_text(_jwt({"sub": "user"}), encoding="utf-8")
-
-    assert auth._session_is_current(missing, skew_seconds=300) is False
-    assert auth._session_is_current(absent, skew_seconds=300) is False
-    assert auth._session_is_current(
-        auth.SessionConfig("DEFAULT", "us-ashburn-1", str(malformed)),
-        skew_seconds=300,
-    ) is False
-    assert auth._session_is_current(
-        auth.SessionConfig("DEFAULT", "us-ashburn-1", str(no_exp)),
-        skew_seconds=300,
-    ) is False
-    assert auth._jwt_expiry("bad-token") is None
-
-    monkeypatch.setattr(auth.oci.config, "from_file", lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("bad")))
-    loaded = auth._load_session_config(
-        SimpleNamespace(profile="DEFAULT", region="us-phoenix-1")
-    )
-
-    assert loaded.profile == "DEFAULT"
-    assert loaded.region == "us-phoenix-1"
-    assert loaded.security_token_file is None
-
-
-def test_session_precheck_honors_oci_config_file(monkeypatch, tmp_path) -> None:
-    custom_config = tmp_path / "oci-config"
-    custom_config.write_text("[VISION_SESSION]\n", encoding="utf-8")
-    monkeypatch.setenv("OCI_CONFIG_FILE", str(custom_config))
-    captured: dict[str, str] = {}
-
-    def fake_from_file(*, file_location: str, profile_name: str):
-        captured["file_location"] = file_location
-        captured["profile_name"] = profile_name
-        return {"region": "us-phoenix-1", "security_token_file": "/tmp/session-token"}
-
-    monkeypatch.setattr(auth.oci.config, "from_file", fake_from_file)
-
-    loaded = auth._load_session_config(
-        SimpleNamespace(profile="VISION_SESSION", region=None)
-    )
-
-    assert captured == {
-        "file_location": str(custom_config),
-        "profile_name": "VISION_SESSION",
-    }
-    assert loaded == auth.SessionConfig(
-        profile="VISION_SESSION",
-        region="us-phoenix-1",
-        security_token_file="/tmp/session-token",
-    )
 
 
 def test_server_main_runs_shared_mcp_app(monkeypatch) -> None:
@@ -148,34 +82,6 @@ def test_image_resolver_rejects_unsafe_or_invalid_inputs(tmp_path) -> None:
         ImageResolver(base_dir=str(base), allowed_extensions={".txt"}).resolve_local_file(
             ImageInput(source_type=ImageSourceType.FILE_PATH, path="text-image.txt")
         )
-
-
-def test_ensure_session_auth_reports_auto_auth_and_manual_auth_paths(monkeypatch) -> None:
-    auto_config = SimpleNamespace(
-        profile="DEFAULT",
-        region=None,
-        token_expiry_skew_seconds=300,
-        refresh_session=False,
-        auto_auth=True,
-        session_auth_command="oci",
-    )
-    manual_config = SimpleNamespace(
-        profile="DEFAULT",
-        region="us-ashburn-1",
-        token_expiry_skew_seconds=300,
-        refresh_session=False,
-        auto_auth=False,
-        session_auth_command="oci",
-    )
-
-    monkeypatch.setattr(auth, "_load_session_config", lambda _resolved: auth.SessionConfig("DEFAULT", None, None))
-    monkeypatch.setattr(auth, "get_resolved_config", lambda **_kwargs: auto_config)
-    with pytest.raises(RuntimeError, match="OCI region is required"):
-        auth.ensure_session_auth()
-
-    monkeypatch.setattr(auth, "get_resolved_config", lambda **_kwargs: manual_config)
-    with pytest.raises(RuntimeError, match="oci session authenticate"):
-        auth.ensure_session_auth()
 
 
 def test_response_rendering_covers_text_faces_and_summary_variants() -> None:
@@ -255,7 +161,6 @@ def test_service_error_helpers_cover_auth_existing_and_header_paths() -> None:
 
 def test_runner_handles_service_and_generic_exceptions(monkeypatch) -> None:
     monkeypatch.setattr(runner, "generate_request_id", lambda: "MCP_REQ")
-    monkeypatch.setattr(runner, "ensure_session_auth", lambda: None)
     monkeypatch.setattr(runner, "create_vision_client", lambda **_kwargs: object())
 
     def service_failure(*_args, **_kwargs):
@@ -518,7 +423,6 @@ def test_image_job_runner_success_and_error_paths(monkeypatch, tmp_path) -> None
     )
     monkeypatch.setattr(runner, "generate_request_id", lambda: "JOB_REQ")
     monkeypatch.setattr(runner, "get_resolved_config", lambda **_kwargs: config)
-    monkeypatch.setattr(runner, "ensure_session_auth", lambda: None)
     monkeypatch.setattr(runner, "create_vision_client", lambda **_kwargs: object())
     monkeypatch.setattr(runner, "create_image_job_payload_size", lambda **_kwargs: 100)
     monkeypatch.setattr(

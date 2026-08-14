@@ -13,7 +13,6 @@ import oci
 from mcp.types import CallToolResult, TextContent
 from pydantic import Field
 
-from ...authentication.auth import ensure_session_auth
 from ...authentication.session_signer import SessionAuthenticationError
 from ...config.consts import (
     MAX_OBJECT_STORAGE_BULK_UPLOAD_IMAGES,
@@ -154,7 +153,6 @@ def _run_single_upload(
     )
     overwrite = args.overwrite if args.overwrite is not None else resolved_config.object_storage_overwrite
 
-    ensure_session_auth()
     client = create_object_storage_client(
         profile=resolved_config.profile,
         region=args.options.region or resolved_config.region,
@@ -270,7 +268,6 @@ def _run_bulk_upload(
     _reject_duplicate_upload_targets([item[2].object_name for item in prepared])
 
     if prepared:
-        ensure_session_auth()
         client = create_object_storage_client(
             profile=resolved_config.profile,
             region=args.options.region or resolved_config.region,

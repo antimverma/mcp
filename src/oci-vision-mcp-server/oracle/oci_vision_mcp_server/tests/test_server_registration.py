@@ -272,10 +272,9 @@ async def test_get_config_status_succeeds_with_optional_connection_config(monkey
     assert "profile=DEFAULT" in _fastmcp_text(result)
 
 
-def test_run_tool_checks_session_auth_before_oci_call(monkeypatch) -> None:
+def test_run_tool_creates_client_before_oci_call(monkeypatch) -> None:
     events = []
 
-    monkeypatch.setattr(analyze_tool, "ensure_session_auth", lambda: events.append("auth"))
     monkeypatch.setattr(
         analyze_tool,
         "create_vision_client",
@@ -299,7 +298,7 @@ def test_run_tool_checks_session_auth_before_oci_call(monkeypatch) -> None:
     )
 
     assert result.isError is False
-    assert events == ["auth", "client", "call"]
+    assert events == ["client", "call"]
 
 
 def test_run_analyze_image_tool_calls_one_combined_oci_request(monkeypatch) -> None:
@@ -307,7 +306,6 @@ def test_run_analyze_image_tool_calls_one_combined_oci_request(monkeypatch) -> N
     captured = {}
 
     monkeypatch.setattr(analyze_tool, "generate_request_id", lambda: "ANALYZE_REQ")
-    monkeypatch.setattr(analyze_tool, "ensure_session_auth", lambda: events.append("auth"))
     monkeypatch.setattr(
         analyze_tool,
         "create_vision_client",
@@ -331,7 +329,7 @@ def test_run_analyze_image_tool_calls_one_combined_oci_request(monkeypatch) -> N
     )
 
     assert result.isError is False
-    assert events == ["auth", "client", "call"]
+    assert events == ["client", "call"]
     assert len(captured["features"]) == 2
     assert captured["compartment_id"] == "ocid1.compartment.oc1..example"
     assert captured["request_id"] == "ANALYZE_REQ"
@@ -343,7 +341,6 @@ def test_create_image_job_uses_object_storage_output_defaults(monkeypatch) -> No
     monkeypatch.setenv("OCI_OBJECT_STORAGE_NAMESPACE", "configured_ns")
     monkeypatch.setenv("OCI_OBJECT_STORAGE_BUCKET", "configured_bucket")
     monkeypatch.setattr(analyze_tool, "generate_request_id", lambda: "JOB_REQ")
-    monkeypatch.setattr(analyze_tool, "ensure_session_auth", lambda: events.append("auth"))
     monkeypatch.setattr(
         analyze_tool,
         "create_vision_client",
@@ -375,7 +372,7 @@ def test_create_image_job_uses_object_storage_output_defaults(monkeypatch) -> No
     )
 
     assert result.isError is False
-    assert events == ["auth", "client", "call"]
+    assert events == ["client", "call"]
     assert captured["compartment_id"] == "ocid1.compartment.oc1..example"
     assert captured["output_location"].namespace_name == "configured_ns"
     assert captured["output_location"].bucket_name == "configured_bucket"
@@ -383,11 +380,11 @@ def test_create_image_job_uses_object_storage_output_defaults(monkeypatch) -> No
     assert captured["request_id"] == "JOB_REQ"
 
 
-def test_create_image_job_rejects_oversized_request_before_auth(monkeypatch) -> None:
+def test_create_image_job_rejects_oversized_request_before_client_creation(monkeypatch) -> None:
     monkeypatch.setattr(
         analyze_tool,
-        "ensure_session_auth",
-        lambda: pytest.fail("auth should not run for an oversized request"),
+        "create_vision_client",
+        lambda **_kwargs: pytest.fail("client should not be created for an oversized request"),
     )
 
     result = analyze_tool.run_create_image_job_tool(
@@ -416,9 +413,7 @@ def test_create_image_job_rejects_oversized_request_before_auth(monkeypatch) -> 
     assert "500 KB limit" in result.structuredContent["errors"][0]["message"]
 
 
-def test_cancel_image_job_requires_explicit_confirmation(monkeypatch) -> None:
-    monkeypatch.setattr(analyze_tool, "ensure_session_auth", lambda: pytest.fail("auth should not run"))
-
+def test_cancel_image_job_requires_explicit_confirmation() -> None:
     result = analyze_tool.run_cancel_image_job_tool(
         {
             "job_id": "ocid1.aivisionimagejob.oc1..example",
@@ -431,14 +426,13 @@ def test_cancel_image_job_requires_explicit_confirmation(monkeypatch) -> None:
     assert "confirm=true" in result.structuredContent["errors"][0]["message"]
 
 
-def test_upload_tool_checks_session_auth_before_object_storage_call(monkeypatch, tmp_path) -> None:
+def test_upload_tool_creates_client_before_object_storage_call(monkeypatch, tmp_path) -> None:
     events = []
     captured = {}
     image_path = tmp_path / "image.png"
     image_path.write_bytes(b"\x89PNG\r\n\x1a\nexample")
     monkeypatch.setenv("MCP_IMAGE_BASE_DIR", str(tmp_path))
     monkeypatch.setattr(upload_tool, "generate_request_id", lambda: "UPLOAD_REQ")
-    monkeypatch.setattr(upload_tool, "ensure_session_auth", lambda: events.append("auth"))
     monkeypatch.setattr(
         upload_tool,
         "create_object_storage_client",
@@ -464,7 +458,7 @@ def test_upload_tool_checks_session_auth_before_object_storage_call(monkeypatch,
     )
 
     assert result.isError is False
-    assert events == ["auth", "client", "call"]
+    assert events == ["client", "call"]
     assert captured["namespace"] == "ns"
     assert captured["bucket"] == "bucket"
     assert captured["object_name"] == "images/image.png"
@@ -501,7 +495,6 @@ def test_upload_tool_raw_detail_exposes_oci_request_id(monkeypatch, tmp_path) ->
     image_path.write_bytes(b"\x89PNG\r\n\x1a\nexample")
     monkeypatch.setenv("MCP_IMAGE_BASE_DIR", str(tmp_path))
     monkeypatch.setattr(upload_tool, "generate_request_id", lambda: "UPLOAD_REQ")
-    monkeypatch.setattr(upload_tool, "ensure_session_auth", lambda: None)
     monkeypatch.setattr(upload_tool, "create_object_storage_client", lambda **_kwargs: object())
     monkeypatch.setattr(
         upload_tool,
@@ -537,7 +530,6 @@ def test_upload_tool_uses_configured_object_storage_defaults(monkeypatch, tmp_pa
     monkeypatch.setenv("OCI_OBJECT_STORAGE_BUCKET", "configured_bucket")
     monkeypatch.setenv("OCI_OBJECT_STORAGE_OVERWRITE", "1")
     monkeypatch.setattr(upload_tool, "generate_request_id", lambda: "UPLOAD_REQ")
-    monkeypatch.setattr(upload_tool, "ensure_session_auth", lambda: None)
     monkeypatch.setattr(upload_tool, "create_object_storage_client", lambda **_kwargs: object())
 
     def fake_put(*_args, **kwargs):
@@ -572,7 +564,6 @@ def test_upload_tool_uses_local_file_name_when_object_name_is_omitted(monkeypatc
     monkeypatch.setenv("OCI_OBJECT_STORAGE_NAMESPACE", "configured_ns")
     monkeypatch.setenv("OCI_OBJECT_STORAGE_BUCKET", "configured_bucket")
     monkeypatch.setattr(upload_tool, "generate_request_id", lambda: "UPLOAD_REQ")
-    monkeypatch.setattr(upload_tool, "ensure_session_auth", lambda: None)
     monkeypatch.setattr(upload_tool, "create_object_storage_client", lambda **_kwargs: object())
 
     def fake_put(*_args, **kwargs):
@@ -616,7 +607,6 @@ def test_list_objects_tool_pages_until_exhausted_and_uses_config_defaults(monkey
     monkeypatch.setenv("OCI_OBJECT_STORAGE_NAMESPACE", "configured_ns")
     monkeypatch.setenv("OCI_OBJECT_STORAGE_BUCKET", "configured_bucket")
     monkeypatch.setattr(list_objects_tool, "generate_request_id", lambda: "LIST_REQ")
-    monkeypatch.setattr(list_objects_tool, "ensure_session_auth", lambda: events.append("auth"))
     monkeypatch.setattr(
         list_objects_tool,
         "create_object_storage_client",
@@ -658,7 +648,7 @@ def test_list_objects_tool_pages_until_exhausted_and_uses_config_defaults(monkey
     result = list_objects_tool.run_list_objects_tool({})
 
     assert result.isError is False
-    assert events == ["auth", "client", "call", "call"]
+    assert events == ["client", "call", "call"]
     assert captured[0]["namespace"] == "configured_ns"
     assert captured[0]["bucket"] == "configured_bucket"
     assert captured[0]["prefix"] is None
@@ -694,7 +684,6 @@ def test_list_objects_tool_allows_explicit_location_to_override_config(monkeypat
     monkeypatch.setenv("OCI_OBJECT_STORAGE_NAMESPACE", "configured_ns")
     monkeypatch.setenv("OCI_OBJECT_STORAGE_BUCKET", "configured_bucket")
     monkeypatch.setattr(list_objects_tool, "generate_request_id", lambda: "LIST_REQ")
-    monkeypatch.setattr(list_objects_tool, "ensure_session_auth", lambda: None)
     monkeypatch.setattr(list_objects_tool, "create_object_storage_client", lambda **_kwargs: object())
 
     def fake_list(*_args, **kwargs):
@@ -745,7 +734,6 @@ def test_list_objects_tool_maps_401_to_session_auth_error(monkeypatch) -> None:
     monkeypatch.setenv("OCI_OBJECT_STORAGE_NAMESPACE", "configured_ns")
     monkeypatch.setenv("OCI_OBJECT_STORAGE_BUCKET", "configured_bucket")
     monkeypatch.setattr(list_objects_tool, "generate_request_id", lambda: "LIST_REQ")
-    monkeypatch.setattr(list_objects_tool, "ensure_session_auth", lambda: None)
     monkeypatch.setattr(list_objects_tool, "create_object_storage_client", lambda **_kwargs: object())
 
     def fake_list(*_args, **_kwargs):
@@ -770,7 +758,6 @@ def test_upload_tool_maps_existing_object_to_structured_error(monkeypatch, tmp_p
     image_path.write_bytes(b"\x89PNG\r\n\x1a\nexample")
     monkeypatch.setenv("MCP_IMAGE_BASE_DIR", str(tmp_path))
     monkeypatch.setattr(upload_tool, "generate_request_id", lambda: "UPLOAD_REQ")
-    monkeypatch.setattr(upload_tool, "ensure_session_auth", lambda: None)
     monkeypatch.setattr(upload_tool, "create_object_storage_client", lambda **_kwargs: object())
 
     def fake_put(*_args, **_kwargs):
@@ -803,7 +790,6 @@ def test_run_tool_generates_request_id_and_stores_result(monkeypatch) -> None:
     captured = {}
 
     monkeypatch.setattr(analyze_tool, "generate_request_id", lambda: "GENERATED_REQ")
-    monkeypatch.setattr(analyze_tool, "ensure_session_auth", lambda: None)
     monkeypatch.setattr(analyze_tool, "create_vision_client", lambda **_kwargs: object())
 
     def fake_call(*_args, **kwargs):
@@ -839,7 +825,6 @@ def test_get_analysis_result_reads_local_store_and_direct_calls_are_not_cached(m
     mcp_request_ids = iter(["MCP_REQ_1", "MCP_REQ_2"])
 
     monkeypatch.setattr(analyze_tool, "generate_request_id", lambda: next(mcp_request_ids))
-    monkeypatch.setattr(analyze_tool, "ensure_session_auth", lambda: None)
     monkeypatch.setattr(analyze_tool, "create_vision_client", lambda **_kwargs: object())
 
     def fake_call(*_args, **kwargs):

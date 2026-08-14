@@ -6,7 +6,6 @@ https://oss.oracle.com/licenses/upl.
 
 from __future__ import annotations
 
-import os
 import shlex
 from dataclasses import dataclass
 
@@ -14,7 +13,6 @@ import oci
 from oracle_mcp_common import AuthOptions, AuthType, build_auth_context, resolve_config_file
 
 from .. import __project__, __version__
-from ..config.consts import DEFAULT_SESSION_AUTH_COMMAND, SESSION_AUTH_COMMAND_ENV
 from ..config.settings import get_resolved_config
 
 _user_agent_name = __project__.split("oracle.", 1)[1].split("-server", 1)[0]
@@ -61,10 +59,11 @@ def session_config(*, profile: str | None = None, region: str | None = None):
 
 
 def session_auth_command(context: SessionAuthContext) -> str:
-    executable = os.getenv(SESSION_AUTH_COMMAND_ENV, DEFAULT_SESSION_AUTH_COMMAND)
+    """Return manual OCI CLI recovery guidance; this command is never executed."""
     region = context.region or "<region>"
+    config_file = resolve_config_file()
     parts = [
-        executable,
+        "oci",
         "session",
         "authenticate",
         "--profile-name",
@@ -72,8 +71,8 @@ def session_auth_command(context: SessionAuthContext) -> str:
         "--region",
         region,
     ]
-    if os.getenv("OCI_CONFIG_FILE"):
-        parts.extend(["--config-location", resolve_config_file()])
+    if config_file != oci.config.DEFAULT_LOCATION:
+        parts.extend(["--config-location", config_file])
     return " ".join(shlex.quote(part) for part in parts)
 
 

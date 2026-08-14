@@ -17,7 +17,6 @@ def test_parallel_analyze_image_calls_analyze_for_each_item(monkeypatch) -> None
     captured_request_ids = []
 
     monkeypatch.setattr(parallel_tool, "generate_request_id", lambda: "BATCH_REQ")
-    monkeypatch.setattr(parallel_tool, "ensure_session_auth", lambda: None)
     monkeypatch.setattr(parallel_tool, "create_vision_client", lambda **_kwargs: object())
 
     def fake_call(*_args, **kwargs):
@@ -65,7 +64,6 @@ def test_parallel_analyze_image_calls_analyze_for_each_item(monkeypatch) -> None
 
 def test_parallel_non_raw_debug_metadata_hides_oci_request_ids(monkeypatch) -> None:
     monkeypatch.setattr(parallel_tool, "generate_request_id", lambda: "BATCH_REQ")
-    monkeypatch.setattr(parallel_tool, "ensure_session_auth", lambda: None)
     monkeypatch.setattr(parallel_tool, "create_vision_client", lambda **_kwargs: object())
     monkeypatch.setattr(
         parallel_tool,
@@ -99,7 +97,6 @@ def test_parallel_non_raw_debug_metadata_hides_oci_request_ids(monkeypatch) -> N
 
 def test_parallel_analyze_image_reports_partial_failure(monkeypatch) -> None:
     monkeypatch.setattr(parallel_tool, "generate_request_id", lambda: "BATCH_REQ")
-    monkeypatch.setattr(parallel_tool, "ensure_session_auth", lambda: None)
     monkeypatch.setattr(parallel_tool, "create_vision_client", lambda **_kwargs: object())
 
     def fake_call(*_args, **kwargs):
@@ -152,7 +149,6 @@ def test_parallel_analyze_image_reports_partial_failure(monkeypatch) -> None:
 
 def test_parallel_analyze_image_returns_error_when_every_item_fails(monkeypatch) -> None:
     monkeypatch.setattr(parallel_tool, "generate_request_id", lambda: "BATCH_REQ")
-    monkeypatch.setattr(parallel_tool, "ensure_session_auth", lambda: None)
     monkeypatch.setattr(parallel_tool, "create_vision_client", lambda **_kwargs: object())
 
     def fake_call(*_args, **_kwargs):

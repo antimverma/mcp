@@ -78,7 +78,6 @@ def test_fetch_object_storage_object_downloads_under_default_download_dir(monkey
     monkeypatch.setenv("OCI_OBJECT_STORAGE_NAMESPACE", "configured_ns")
     monkeypatch.setenv("OCI_OBJECT_STORAGE_BUCKET", "configured_bucket")
     monkeypatch.setattr(fetch_tool, "generate_request_id", lambda: "FETCH_REQ")
-    monkeypatch.setattr(fetch_tool, "ensure_session_auth", lambda: events.append("auth"))
     monkeypatch.setattr(
         fetch_tool,
         "create_object_storage_client",
@@ -105,7 +104,7 @@ def test_fetch_object_storage_object_downloads_under_default_download_dir(monkey
     expected_name = f"{safe_request_key('FETCH_REQ')[:12]}-sample.jpg"
     downloaded = tmp_path / "obj_results" / expected_name
     assert result.isError is False
-    assert events == ["auth", "client", "call"]
+    assert events == ["client", "call"]
     assert captured["namespace"] == "configured_ns"
     assert captured["bucket"] == "configured_bucket"
     assert captured["object_name"] == "images/sample.jpg"
@@ -148,7 +147,6 @@ def test_fetch_object_storage_object_allows_download_dir_outside_image_base(monk
     monkeypatch.setenv("OCI_OBJECT_STORAGE_NAMESPACE", "configured_ns")
     monkeypatch.setenv("OCI_OBJECT_STORAGE_BUCKET", "configured_bucket")
     monkeypatch.setattr(fetch_tool, "generate_request_id", lambda: "FETCH_REQ")
-    monkeypatch.setattr(fetch_tool, "ensure_session_auth", lambda: None)
     monkeypatch.setattr(fetch_tool, "create_object_storage_client", lambda **_kwargs: object())
     monkeypatch.setattr(
         fetch_tool,
@@ -174,7 +172,6 @@ def test_fetch_object_storage_object_maps_401_to_session_auth_error(monkeypatch)
     monkeypatch.setenv("OCI_OBJECT_STORAGE_NAMESPACE", "configured_ns")
     monkeypatch.setenv("OCI_OBJECT_STORAGE_BUCKET", "configured_bucket")
     monkeypatch.setattr(fetch_tool, "generate_request_id", lambda: "FETCH_REQ")
-    monkeypatch.setattr(fetch_tool, "ensure_session_auth", lambda: None)
     monkeypatch.setattr(fetch_tool, "create_object_storage_client", lambda **_kwargs: object())
 
     def fake_get(*_args, **_kwargs):

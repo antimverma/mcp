@@ -14,24 +14,19 @@ from pathlib import Path
 from typing import Any
 
 from .consts import (
-    DEFAULT_AUTO_AUTH,
     DEFAULT_DETAIL,
     DEFAULT_ENABLE_URL_INPUTS,
-    DEFAULT_EXPIRY_SKEW_SECONDS,
     DEFAULT_LOG_DIR,
     DEFAULT_MAX_IMAGE_BYTES,
     DEFAULT_MAX_INLINE_RESPONSE_BYTES,
     DEFAULT_OBJECT_STORAGE_DOWNLOAD_DIR,
     DEFAULT_OBJECT_STORAGE_FETCH_MAX_BYTES,
     DEFAULT_OBJECT_STORAGE_OVERWRITE,
-    DEFAULT_REFRESH_SESSION,
     DEFAULT_RESULT_STORE_DIR,
     DEFAULT_RESULT_TTL_SECONDS,
-    DEFAULT_SESSION_AUTH_COMMAND,
     DEFAULT_URL_CONNECT_TIMEOUT_SECONDS,
     DEFAULT_URL_MAX_REDIRECTS,
     DEFAULT_URL_READ_TIMEOUT_SECONDS,
-    SESSION_AUTH_COMMAND_ENV,
 )
 
 ENV_PROFILE = "OCI_CONFIG_PROFILE"
@@ -39,9 +34,6 @@ ENV_REGION = "OCI_REGION"
 ENV_DEFAULT_COMPARTMENT_ID = "OCI_VISION_DEFAULT_COMPARTMENT_ID"
 ENV_IMAGE_BASE_DIR = "MCP_IMAGE_BASE_DIR"
 ENV_MAX_IMAGE_BYTES = "MCP_MAX_IMAGE_BYTES"
-ENV_REFRESH_SESSION = "OCI_MCP_REFRESH_SESSION"
-ENV_AUTO_AUTH = "OCI_MCP_AUTO_AUTH"
-ENV_EXPIRY_SKEW_SECONDS = "OCI_MCP_TOKEN_EXPIRY_SKEW_SECONDS"
 ENV_RESULT_STORE_DIR = "OCI_VISION_RESULT_STORE_DIR"
 ENV_LOG_DIR = "OCI_VISION_LOG_DIR"
 ENV_RESULT_TTL_SECONDS = "OCI_VISION_RESULT_TTL_SECONDS"
@@ -81,10 +73,6 @@ class ResolvedMcpConfig:
     default_compartment_id: str | None
     image_base_dir: str
     max_image_bytes: int
-    refresh_session: bool
-    auto_auth: bool
-    token_expiry_skew_seconds: int
-    session_auth_command: str
     result_store_dir: str
     log_dir: str
     result_ttl_seconds: int
@@ -111,10 +99,6 @@ class ResolvedMcpConfig:
             "default_compartment_id": self.default_compartment_id,
             "image_base_dir": self.image_base_dir,
             "max_image_bytes": self.max_image_bytes,
-            "refresh_session": self.refresh_session,
-            "auto_auth": self.auto_auth,
-            "token_expiry_skew_seconds": self.token_expiry_skew_seconds,
-            "session_auth_command": self.session_auth_command,
             "result_store_dir": self.result_store_dir,
             "log_dir": self.log_dir,
             "result_ttl_seconds": self.result_ttl_seconds,
@@ -190,44 +174,6 @@ ENV_VAR_CATALOG: tuple[EnvVarInfo, ...] = (
         default=str(DEFAULT_MAX_IMAGE_BYTES),
         used_in="config/settings.py, io/image_loader.py",
         effect="Images larger than this are rejected before OCI calls.",
-    ),
-    EnvVarInfo(
-        name=ENV_REFRESH_SESSION,
-        purpose="Allow startup to refresh expired OCI session tokens.",
-        required=False,
-        default=str(DEFAULT_REFRESH_SESSION).lower(),
-        used_in="config/settings.py, authentication/auth.py",
-        effect=(
-            "When true, startup and tool calls may run "
-            "`<session_auth_command> session refresh --profile <profile>`."
-        ),
-    ),
-    EnvVarInfo(
-        name=ENV_AUTO_AUTH,
-        purpose="Allow startup to run browser-based session authentication.",
-        required=False,
-        default=str(DEFAULT_AUTO_AUTH).lower(),
-        used_in="config/settings.py, authentication/auth.py",
-        effect=(
-            "When true, startup and tool calls may run "
-            "`<session_auth_command> session authenticate` if refresh is insufficient."
-        ),
-    ),
-    EnvVarInfo(
-        name=ENV_EXPIRY_SKEW_SECONDS,
-        purpose="Seconds before token expiry to treat the session as stale.",
-        required=False,
-        default=str(DEFAULT_EXPIRY_SKEW_SECONDS),
-        used_in="config/settings.py, authentication/auth.py",
-        effect="Controls how early startup and tool calls refresh/authenticate.",
-    ),
-    EnvVarInfo(
-        name=SESSION_AUTH_COMMAND_ENV,
-        purpose="CLI executable used for OCI session commands.",
-        required=False,
-        default=DEFAULT_SESSION_AUTH_COMMAND,
-        used_in="config/settings.py, authentication/auth.py, authentication/session_signer.py",
-        effect="Defaults to `oci`; set to another compatible executable only when the environment requires it.",
     ),
     EnvVarInfo(
         name=ENV_RESULT_STORE_DIR,
@@ -416,38 +362,6 @@ def get_resolved_config(
         max_image_bytes = DEFAULT_MAX_IMAGE_BYTES
         sources["max_image_bytes"] = f"default:invalid:{ENV_MAX_IMAGE_BYTES}"
         locked["max_image_bytes"] = False
-    refresh_session = _resolve_bool(
-        "refresh_session",
-        env_name=ENV_REFRESH_SESSION,
-        default=DEFAULT_REFRESH_SESSION,
-        sources=sources,
-        locked=locked,
-        diagnostic_errors=_diagnostic_errors,
-    )
-    auto_auth = _resolve_bool(
-        "auto_auth",
-        env_name=ENV_AUTO_AUTH,
-        default=DEFAULT_AUTO_AUTH,
-        sources=sources,
-        locked=locked,
-        diagnostic_errors=_diagnostic_errors,
-    )
-    token_expiry_skew_seconds = _resolve_int(
-        "token_expiry_skew_seconds",
-        env_name=ENV_EXPIRY_SKEW_SECONDS,
-        default=DEFAULT_EXPIRY_SKEW_SECONDS,
-        sources=sources,
-        locked=locked,
-        diagnostic_errors=_diagnostic_errors,
-    )
-    session_auth_command = _resolve_string(
-        "session_auth_command",
-        env_name=SESSION_AUTH_COMMAND_ENV,
-        sources=sources,
-        locked=locked,
-        default=DEFAULT_SESSION_AUTH_COMMAND,
-        default_source="default",
-    )
     result_store_dir = _resolve_string(
         "result_store_dir",
         env_name=ENV_RESULT_STORE_DIR,
@@ -588,10 +502,6 @@ def get_resolved_config(
         default_compartment_id=default_compartment_id,
         image_base_dir=image_base_dir,
         max_image_bytes=max_image_bytes,
-        refresh_session=refresh_session,
-        auto_auth=auto_auth,
-        token_expiry_skew_seconds=token_expiry_skew_seconds,
-        session_auth_command=session_auth_command,
         result_store_dir=result_store_dir,
         log_dir=log_dir,
         result_ttl_seconds=result_ttl_seconds,

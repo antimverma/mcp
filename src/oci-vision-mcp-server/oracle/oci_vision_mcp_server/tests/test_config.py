@@ -18,13 +18,6 @@ from oracle.oci_vision_mcp_server.config.settings import (
 )
 
 
-def test_session_auth_catalog_defaults_match_runtime_defaults() -> None:
-    catalog = {item["name"]: item for item in env_var_catalog()}
-
-    assert catalog["OCI_MCP_REFRESH_SESSION"]["default"] == "true"
-    assert catalog["OCI_MCP_AUTO_AUTH"]["default"] == "false"
-
-
 def test_required_env_values_are_resolved_and_locked() -> None:
     config = get_resolved_config()
 
@@ -103,15 +96,6 @@ def test_config_diagnostics_marks_invalid_default_detail_as_fallback(monkeypatch
     }
 
 
-def test_auth_flags_default_to_public_repo_defaults() -> None:
-    config = get_resolved_config()
-
-    assert config.refresh_session is True
-    assert config.auto_auth is False
-    assert config.sources["refresh_session"] == "default"
-    assert config.sources["auto_auth"] == "default"
-
-
 def test_url_inputs_default_to_disabled() -> None:
     config = get_resolved_config()
 
@@ -156,10 +140,6 @@ def test_image_base_defaults_to_current_directory(monkeypatch, tmp_path) -> None
 def test_optional_env_values_override_defaults(monkeypatch) -> None:
     monkeypatch.setenv("MCP_IMAGE_BASE_DIR", "/tmp/images")
     monkeypatch.setenv("MCP_MAX_IMAGE_BYTES", "1234")
-    monkeypatch.setenv("OCI_MCP_REFRESH_SESSION", "0")
-    monkeypatch.setenv("OCI_MCP_AUTO_AUTH", "0")
-    monkeypatch.setenv("OCI_MCP_TOKEN_EXPIRY_SKEW_SECONDS", "60")
-    monkeypatch.setenv("OCI_SESSION_AUTH_COMMAND", "ossh")
     monkeypatch.setenv("OCI_VISION_LOG_DIR", "/tmp/oci-vision-logs")
     monkeypatch.setenv("OCI_OBJECT_STORAGE_NAMESPACE", "ns")
     monkeypatch.setenv("OCI_OBJECT_STORAGE_BUCKET", "bucket")
@@ -175,10 +155,6 @@ def test_optional_env_values_override_defaults(monkeypatch) -> None:
 
     assert config.image_base_dir == "/tmp/images"
     assert config.max_image_bytes == 1234
-    assert config.refresh_session is False
-    assert config.auto_auth is False
-    assert config.token_expiry_skew_seconds == 60
-    assert config.session_auth_command == "ossh"
     assert config.log_dir == "/tmp/oci-vision-logs"
     assert config.object_storage_namespace == "ns"
     assert config.object_storage_bucket == "bucket"
@@ -243,15 +219,6 @@ def test_image_size_override_cannot_exceed_oci_vision_limit(monkeypatch) -> None
         get_resolved_config()
 
 
-def test_invalid_boolean_env_raises_configuration_error(monkeypatch) -> None:
-    monkeypatch.setenv("OCI_MCP_AUTO_AUTH", "maybe")
-
-    with pytest.raises(McpConfigurationError) as exc_info:
-        get_resolved_config()
-
-    assert "OCI_MCP_AUTO_AUTH must be a boolean value" in str(exc_info.value)
-
-
 def test_invalid_float_env_raises_configuration_error(monkeypatch) -> None:
     monkeypatch.setenv("OCI_VISION_URL_CONNECT_TIMEOUT_SECONDS", "slow")
 
@@ -282,10 +249,6 @@ def test_env_var_catalog_lists_required_and_optional_vars() -> None:
         "OCI_VISION_DEFAULT_COMPARTMENT_ID",
         "MCP_IMAGE_BASE_DIR",
         "MCP_MAX_IMAGE_BYTES",
-        "OCI_MCP_REFRESH_SESSION",
-        "OCI_MCP_AUTO_AUTH",
-        "OCI_MCP_TOKEN_EXPIRY_SKEW_SECONDS",
-        "OCI_SESSION_AUTH_COMMAND",
         "OCI_VISION_RESULT_STORE_DIR",
         "OCI_VISION_LOG_DIR",
         "OCI_VISION_RESULT_TTL_SECONDS",
@@ -303,10 +266,3 @@ def test_env_var_catalog_lists_required_and_optional_vars() -> None:
             "OCI_VISION_URL_CONNECT_TIMEOUT_SECONDS",
             "OCI_VISION_URL_READ_TIMEOUT_SECONDS",
         } <= names
-
-
-def test_session_auth_command_defaults_to_oci() -> None:
-    config = get_resolved_config()
-
-    assert config.session_auth_command == "oci"
-    assert config.sources["session_auth_command"] == "default"

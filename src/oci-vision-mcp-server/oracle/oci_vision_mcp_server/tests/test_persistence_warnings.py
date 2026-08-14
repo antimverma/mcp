@@ -46,7 +46,6 @@ def _assert_persistence_warning(result) -> None:
 
 def test_vision_success_survives_result_persistence_failure(monkeypatch) -> None:
     monkeypatch.setattr(vision_runner, "generate_request_id", lambda: "VISION_REQ")
-    monkeypatch.setattr(vision_runner, "ensure_session_auth", lambda: None)
     monkeypatch.setattr(vision_runner, "create_vision_client", lambda **_kwargs: object())
     monkeypatch.setattr(
         vision_runner,
@@ -74,7 +73,6 @@ def test_vision_success_survives_result_persistence_failure(monkeypatch) -> None
 
 def test_parallel_success_survives_result_persistence_failure(monkeypatch) -> None:
     monkeypatch.setattr(parallel_tool, "generate_request_id", lambda: "BATCH_REQ")
-    monkeypatch.setattr(parallel_tool, "ensure_session_auth", lambda: None)
     monkeypatch.setattr(parallel_tool, "create_vision_client", lambda **_kwargs: object())
     monkeypatch.setattr(
         parallel_tool,
@@ -105,7 +103,6 @@ def test_upload_success_survives_result_persistence_failure(monkeypatch, tmp_pat
     (tmp_path / "image.png").write_bytes(PNG_BYTES)
     monkeypatch.setenv("MCP_IMAGE_BASE_DIR", str(tmp_path))
     monkeypatch.setattr(upload_tool, "generate_request_id", lambda: "UPLOAD_REQ")
-    monkeypatch.setattr(upload_tool, "ensure_session_auth", lambda: None)
     monkeypatch.setattr(upload_tool, "create_object_storage_client", lambda **_kwargs: object())
     monkeypatch.setattr(
         upload_tool,
@@ -139,7 +136,6 @@ def test_list_success_survives_result_persistence_failure(monkeypatch) -> None:
     monkeypatch.setenv("OCI_OBJECT_STORAGE_NAMESPACE", "namespace")
     monkeypatch.setenv("OCI_OBJECT_STORAGE_BUCKET", "bucket")
     monkeypatch.setattr(list_tool, "generate_request_id", lambda: "LIST_REQ")
-    monkeypatch.setattr(list_tool, "ensure_session_auth", lambda: None)
     monkeypatch.setattr(list_tool, "create_object_storage_client", lambda **_kwargs: object())
     monkeypatch.setattr(
         list_tool,
@@ -163,7 +159,6 @@ def test_fetch_success_survives_result_persistence_failure(monkeypatch, tmp_path
     monkeypatch.setenv("OCI_OBJECT_STORAGE_NAMESPACE", "namespace")
     monkeypatch.setenv("OCI_OBJECT_STORAGE_BUCKET", "bucket")
     monkeypatch.setattr(fetch_tool, "generate_request_id", lambda: "FETCH_REQ")
-    monkeypatch.setattr(fetch_tool, "ensure_session_auth", lambda: None)
     monkeypatch.setattr(fetch_tool, "create_object_storage_client", lambda **_kwargs: object())
     monkeypatch.setattr(
         fetch_tool,

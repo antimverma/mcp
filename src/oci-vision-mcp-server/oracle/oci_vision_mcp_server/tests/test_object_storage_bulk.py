@@ -27,7 +27,6 @@ def test_bulk_fetch_downloads_multiple_objects(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("OCI_OBJECT_STORAGE_NAMESPACE", "configured_ns")
     monkeypatch.setenv("OCI_OBJECT_STORAGE_BUCKET", "configured_bucket")
     monkeypatch.setattr(fetch_tool, "generate_request_id", lambda: "BULK_FETCH_REQ")
-    monkeypatch.setattr(fetch_tool, "ensure_session_auth", lambda: events.append("auth"))
     monkeypatch.setattr(
         fetch_tool,
         "create_object_storage_client",
@@ -57,7 +56,7 @@ def test_bulk_fetch_downloads_multiple_objects(monkeypatch, tmp_path) -> None:
     )
 
     assert result.isError is False
-    assert events == ["auth", "client", "call", "call"]
+    assert events == ["client", "call", "call"]
     assert calls == ["images/one.jpg", "nested/two.jpg"]
     assert (tmp_path / "obj_results" / "downloads" / "images" / "one.jpg").is_file()
     assert (tmp_path / "obj_results" / "downloads" / "nested" / "two.jpg").is_file()
@@ -78,7 +77,6 @@ def test_bulk_fetch_reports_partial_failure(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("OCI_OBJECT_STORAGE_NAMESPACE", "configured_ns")
     monkeypatch.setenv("OCI_OBJECT_STORAGE_BUCKET", "configured_bucket")
     monkeypatch.setattr(fetch_tool, "generate_request_id", lambda: "BULK_FETCH_REQ")
-    monkeypatch.setattr(fetch_tool, "ensure_session_auth", lambda: None)
     monkeypatch.setattr(fetch_tool, "create_object_storage_client", lambda **_kwargs: object())
 
     def fake_get(*_args, **kwargs):
@@ -111,7 +109,6 @@ def test_bulk_fetch_rejects_unsafe_object_path(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("OCI_OBJECT_STORAGE_NAMESPACE", "configured_ns")
     monkeypatch.setenv("OCI_OBJECT_STORAGE_BUCKET", "configured_bucket")
     monkeypatch.setattr(fetch_tool, "generate_request_id", lambda: "BULK_FETCH_REQ")
-    monkeypatch.setattr(fetch_tool, "ensure_session_auth", lambda: None)
     monkeypatch.setattr(fetch_tool, "create_object_storage_client", lambda **_kwargs: object())
     monkeypatch.setattr(fetch_tool, "call_get_object", lambda *_args, **_kwargs: pytest.fail("OCI should not be called"))
 
@@ -133,7 +130,6 @@ def test_bulk_fetch_rejects_intermediate_symlink_escape(monkeypatch, tmp_path) -
     monkeypatch.setenv("OCI_OBJECT_STORAGE_NAMESPACE", "configured_ns")
     monkeypatch.setenv("OCI_OBJECT_STORAGE_BUCKET", "configured_bucket")
     monkeypatch.setattr(fetch_tool, "generate_request_id", lambda: "BULK_FETCH_REQ")
-    monkeypatch.setattr(fetch_tool, "ensure_session_auth", lambda: None)
     monkeypatch.setattr(fetch_tool, "create_object_storage_client", lambda **_kwargs: object())
     monkeypatch.setattr(
         fetch_tool,
@@ -160,7 +156,6 @@ def test_bulk_upload_uploads_multiple_images_to_prefix(monkeypatch, tmp_path) ->
     (tmp_path / "two.jpg").write_bytes(JPEG_BYTES)
     monkeypatch.setenv("MCP_IMAGE_BASE_DIR", str(tmp_path))
     monkeypatch.setattr(upload_tool, "generate_request_id", lambda: "BULK_UPLOAD_REQ")
-    monkeypatch.setattr(upload_tool, "ensure_session_auth", lambda: events.append("auth"))
     monkeypatch.setattr(
         upload_tool,
         "create_object_storage_client",
@@ -186,7 +181,7 @@ def test_bulk_upload_uploads_multiple_images_to_prefix(monkeypatch, tmp_path) ->
     )
 
     assert result.isError is False
-    assert events == ["auth", "client", "call", "call"]
+    assert events == ["client", "call", "call"]
     assert calls == ["incoming/one.png", "incoming/two.jpg"]
     assert result.structuredContent["total_count"] == 2
     assert result.structuredContent["succeeded_count"] == 2
@@ -200,7 +195,6 @@ def test_bulk_upload_reports_partial_failure(monkeypatch, tmp_path) -> None:
     (tmp_path / "two.png").write_bytes(PNG_BYTES)
     monkeypatch.setenv("MCP_IMAGE_BASE_DIR", str(tmp_path))
     monkeypatch.setattr(upload_tool, "generate_request_id", lambda: "BULK_UPLOAD_REQ")
-    monkeypatch.setattr(upload_tool, "ensure_session_auth", lambda: None)
     monkeypatch.setattr(upload_tool, "create_object_storage_client", lambda **_kwargs: object())
 
     def fake_put(*_args, **kwargs):
@@ -229,14 +223,13 @@ def test_bulk_upload_reports_partial_failure(monkeypatch, tmp_path) -> None:
     assert failed[0]["errors"][0]["code"] == "OBJECT_ALREADY_EXISTS"
 
 
-def test_bulk_upload_rejects_duplicate_target_names_before_auth(monkeypatch, tmp_path) -> None:
+def test_bulk_upload_rejects_duplicate_target_names_before_client_creation(monkeypatch, tmp_path) -> None:
     (tmp_path / "a").mkdir()
     (tmp_path / "b").mkdir()
     (tmp_path / "a" / "same.png").write_bytes(PNG_BYTES)
     (tmp_path / "b" / "same.png").write_bytes(PNG_BYTES)
     monkeypatch.setenv("MCP_IMAGE_BASE_DIR", str(tmp_path))
     monkeypatch.setattr(upload_tool, "generate_request_id", lambda: "BULK_UPLOAD_REQ")
-    monkeypatch.setattr(upload_tool, "ensure_session_auth", lambda: pytest.fail("auth should not run"))
 
     result = upload_tool.run_upload_tool(
         {
@@ -257,7 +250,6 @@ def test_upload_rejects_content_type_that_does_not_match_bytes(monkeypatch, tmp_
     (tmp_path / "image.png").write_bytes(PNG_BYTES)
     monkeypatch.setenv("MCP_IMAGE_BASE_DIR", str(tmp_path))
     monkeypatch.setattr(upload_tool, "generate_request_id", lambda: "UPLOAD_REQ")
-    monkeypatch.setattr(upload_tool, "ensure_session_auth", lambda: pytest.fail("auth should not run"))
 
     result = upload_tool.run_upload_tool(
         {
