@@ -5,4 +5,3 @@ https://oss.oracle.com/licenses/upl.
 
 Authentication helpers for OCI session-token profiles.
 """
-
