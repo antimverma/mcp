@@ -16,7 +16,6 @@ from typing import Any
 from .consts import (
     DEFAULT_DETAIL,
     DEFAULT_ENABLE_URL_INPUTS,
-    DEFAULT_LOG_DIR,
     DEFAULT_MAX_IMAGE_BYTES,
     DEFAULT_MAX_INLINE_RESPONSE_BYTES,
     DEFAULT_OBJECT_STORAGE_DOWNLOAD_DIR,
@@ -35,7 +34,6 @@ ENV_DEFAULT_COMPARTMENT_ID = "OCI_VISION_DEFAULT_COMPARTMENT_ID"
 ENV_IMAGE_BASE_DIR = "MCP_IMAGE_BASE_DIR"
 ENV_MAX_IMAGE_BYTES = "MCP_MAX_IMAGE_BYTES"
 ENV_RESULT_STORE_DIR = "OCI_VISION_RESULT_STORE_DIR"
-ENV_LOG_DIR = "OCI_VISION_LOG_DIR"
 ENV_RESULT_TTL_SECONDS = "OCI_VISION_RESULT_TTL_SECONDS"
 ENV_MAX_INLINE_RESPONSE_BYTES = "OCI_VISION_MAX_INLINE_RESPONSE_BYTES"
 ENV_DEFAULT_DETAIL = "OCI_VISION_DEFAULT_DETAIL"
@@ -74,7 +72,6 @@ class ResolvedMcpConfig:
     image_base_dir: str
     max_image_bytes: int
     result_store_dir: str
-    log_dir: str
     result_ttl_seconds: int
     max_inline_response_bytes: int
     default_detail: str
@@ -100,7 +97,6 @@ class ResolvedMcpConfig:
             "image_base_dir": self.image_base_dir,
             "max_image_bytes": self.max_image_bytes,
             "result_store_dir": self.result_store_dir,
-            "log_dir": self.log_dir,
             "result_ttl_seconds": self.result_ttl_seconds,
             "max_inline_response_bytes": self.max_inline_response_bytes,
             "default_detail": self.default_detail,
@@ -140,7 +136,7 @@ ENV_VAR_CATALOG: tuple[EnvVarInfo, ...] = (
         purpose="OCI CLI profile used for session-token auth.",
         required=False,
         default="DEFAULT",
-        used_in="config/settings.py, authentication/auth.py, authentication/session_signer.py, oci_clients/vision.py, oci_clients/object_storage.py",
+        used_in="config/settings.py, authentication/session_signer.py, oci_clients/vision.py, oci_clients/object_storage.py",
         effect="Selects the OCI profile read from ~/.oci/config.",
     ),
     EnvVarInfo(
@@ -148,7 +144,7 @@ ENV_VAR_CATALOG: tuple[EnvVarInfo, ...] = (
         purpose="OCI region override for session authentication and Vision endpoint.",
         required=False,
         default="profile region",
-        used_in="config/settings.py, authentication/auth.py, authentication/session_signer.py, oci_clients/vision.py, oci_clients/object_storage.py",
+        used_in="config/settings.py, authentication/session_signer.py, oci_clients/vision.py, oci_clients/object_storage.py",
         effect="Sets the region for session auth and AIServiceVisionClient.",
     ),
     EnvVarInfo(
@@ -182,14 +178,6 @@ ENV_VAR_CATALOG: tuple[EnvVarInfo, ...] = (
         default="~/.oci-vision-mcp/results",
         used_in="config/settings.py, io/result_store.py, tools/vision_api_tools/runner.py, tools/support_tools/get_analysis_result.py",
         effect="Controls where raw and metadata result files are written.",
-    ),
-    EnvVarInfo(
-        name=ENV_LOG_DIR,
-        purpose="Directory for MCP server diagnostic logs.",
-        required=False,
-        default="~/.oci-vision-mcp/logs",
-        used_in="config/settings.py, observability/stderr.py, runtime/launcher.py",
-        effect="Controls where launcher/server stderr is mirrored for diagnostics.",
     ),
     EnvVarInfo(
         name=ENV_RESULT_TTL_SECONDS,
@@ -370,14 +358,6 @@ def get_resolved_config(
         default=str(DEFAULT_RESULT_STORE_DIR),
         default_source="default",
     )
-    log_dir = _resolve_string(
-        "log_dir",
-        env_name=ENV_LOG_DIR,
-        sources=sources,
-        locked=locked,
-        default=str(DEFAULT_LOG_DIR),
-        default_source="default",
-    )
     result_ttl_seconds = _resolve_int(
         "result_ttl_seconds",
         env_name=ENV_RESULT_TTL_SECONDS,
@@ -503,7 +483,6 @@ def get_resolved_config(
         image_base_dir=image_base_dir,
         max_image_bytes=max_image_bytes,
         result_store_dir=result_store_dir,
-        log_dir=log_dir,
         result_ttl_seconds=result_ttl_seconds,
         max_inline_response_bytes=max_inline_response_bytes,
         default_detail=default_detail,

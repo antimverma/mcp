@@ -140,7 +140,6 @@ def test_image_base_defaults_to_current_directory(monkeypatch, tmp_path) -> None
 def test_optional_env_values_override_defaults(monkeypatch) -> None:
     monkeypatch.setenv("MCP_IMAGE_BASE_DIR", "/tmp/images")
     monkeypatch.setenv("MCP_MAX_IMAGE_BYTES", "1234")
-    monkeypatch.setenv("OCI_VISION_LOG_DIR", "/tmp/oci-vision-logs")
     monkeypatch.setenv("OCI_OBJECT_STORAGE_NAMESPACE", "ns")
     monkeypatch.setenv("OCI_OBJECT_STORAGE_BUCKET", "bucket")
     monkeypatch.setenv("OCI_OBJECT_STORAGE_OVERWRITE", "1")
@@ -155,7 +154,6 @@ def test_optional_env_values_override_defaults(monkeypatch) -> None:
 
     assert config.image_base_dir == "/tmp/images"
     assert config.max_image_bytes == 1234
-    assert config.log_dir == "/tmp/oci-vision-logs"
     assert config.object_storage_namespace == "ns"
     assert config.object_storage_bucket == "bucket"
     assert config.job_output_namespace == "ns"
@@ -230,18 +228,17 @@ def test_invalid_float_env_raises_configuration_error(monkeypatch) -> None:
 
 def test_runtime_dirs_default_to_client_neutral_directory(monkeypatch) -> None:
     monkeypatch.delenv("OCI_VISION_RESULT_STORE_DIR", raising=False)
-    monkeypatch.delenv("OCI_VISION_LOG_DIR", raising=False)
 
     config = get_resolved_config()
     runtime_dir = Path.home() / ".oci-vision-mcp"
 
     assert config.result_store_dir == str(runtime_dir / "results")
-    assert config.log_dir == str(runtime_dir / "logs")
 
 
 def test_env_var_catalog_lists_required_and_optional_vars() -> None:
     catalog = env_var_catalog()
     names = {item["name"] for item in catalog}
+    profile_entry = next(item for item in catalog if item["name"] == "OCI_CONFIG_PROFILE")
 
     assert {
         "OCI_CONFIG_PROFILE",
@@ -250,7 +247,6 @@ def test_env_var_catalog_lists_required_and_optional_vars() -> None:
         "MCP_IMAGE_BASE_DIR",
         "MCP_MAX_IMAGE_BYTES",
         "OCI_VISION_RESULT_STORE_DIR",
-        "OCI_VISION_LOG_DIR",
         "OCI_VISION_RESULT_TTL_SECONDS",
         "OCI_VISION_MAX_INLINE_RESPONSE_BYTES",
             "OCI_VISION_DEFAULT_DETAIL",
@@ -266,3 +262,4 @@ def test_env_var_catalog_lists_required_and_optional_vars() -> None:
             "OCI_VISION_URL_CONNECT_TIMEOUT_SECONDS",
             "OCI_VISION_URL_READ_TIMEOUT_SECONDS",
         } <= names
+    assert "authentication/auth.py" not in profile_entry["used_in"]

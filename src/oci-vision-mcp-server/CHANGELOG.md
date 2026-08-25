@@ -18,6 +18,8 @@
 
 ### Fixed
 
+- Corrected the configuration-status environment-variable catalog.
+- Removed the unused stderr-log configuration and implementation.
 - Include image-validation and Object Storage download code in the coverage gate.
 - Preserve the selected profile's configured region when handling an OCI session-authentication failure.
 - Keep OCI session authentication outside the server process; the server no longer invokes the OCI CLI or starts browser-based authentication.

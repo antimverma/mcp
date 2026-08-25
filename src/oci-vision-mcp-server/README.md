@@ -86,7 +86,6 @@ oci session authenticate --config-location /path/to/config --profile-name DEFAUL
 | `OCI_VISION_DEFAULT_COMPARTMENT_ID` | Yes for Vision tools unless passed in the tool input | None | Default compartment OCID for Vision requests. |
 | `MCP_IMAGE_BASE_DIR` | No | Current working directory | Base directory used to validate local `file_path` image inputs. Vision analysis accepts JPEG/PNG inputs up to 5 MiB. |
 | `OCI_VISION_RESULT_STORE_DIR` | No | `~/.oci-vision-mcp/results` | Directory for raw OCI result metadata. |
-| `OCI_VISION_LOG_DIR` | No | `~/.oci-vision-mcp/logs` | Directory reserved for MCP diagnostic logs. |
 | `OCI_OBJECT_STORAGE_NAMESPACE` | No | None | Default namespace for Object Storage tools and image-job output. |
 | `OCI_OBJECT_STORAGE_BUCKET` | No | None | Default bucket for Object Storage tools and image-job output. |
 | `OCI_OBJECT_STORAGE_DOWNLOAD_DIR` | No | `~/.oci-vision-mcp/obj_results` | Local directory used by `fetch_object_storage_object`. |
@@ -136,7 +135,6 @@ oci-vision-mcp-server/
         ├── authentication/
         ├── config/
         ├── io/
-        ├── observability/
         ├── oci_clients/
         ├── oci_mapper/
         ├── prompts/
