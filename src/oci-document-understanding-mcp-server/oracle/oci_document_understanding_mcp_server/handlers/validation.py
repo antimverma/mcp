@@ -77,4 +77,3 @@ def optional_number_between(arguments: dict[str, Any], name: str, minimum: float
     if number < minimum or number > maximum:
         raise ValueError(f"{name} must be between {minimum:g} and {maximum:g}")
     return number
-

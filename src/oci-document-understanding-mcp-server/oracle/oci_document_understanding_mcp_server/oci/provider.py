@@ -30,4 +30,3 @@ def create_provider(config: OciDocumentUnderstandingConfig) -> OciDocumentUnders
     from oracle.oci_document_understanding_mcp_server.oci.sdk_provider import OciSdkDocumentUnderstandingProvider
 
     return OciSdkDocumentUnderstandingProvider(config)
-
