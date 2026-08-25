@@ -25,8 +25,6 @@ class OciAuthenticationError(RuntimeError):
 
 @dataclass(frozen=True)
 class OciAuthContext:
-    mode: str
-    region: str
     config: dict[str, Any]
     signer: Any
 
@@ -62,8 +60,6 @@ def build_auth_context(
     if selected_region:
         config["region"] = selected_region
     return OciAuthContext(
-        mode=settings.oci_auth_mode,
-        region=selected_region or "endpoint-override",
         config=config,
         signer=auth_context.signer,
     )

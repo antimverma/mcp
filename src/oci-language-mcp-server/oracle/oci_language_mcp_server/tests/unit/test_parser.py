@@ -557,6 +557,25 @@ def test_parser_synthesizes_missing_document_result() -> None:
     assert result.errors[0].code == "UPSTREAM_MISSING_RESULT"
 
 
+def test_parser_marks_every_submitted_document_when_response_is_empty() -> None:
+    request = REQUEST_MODELS["detect_dominant_language"].model_validate(
+        {"documents": [{"key": "one", "text": "hello"}, {"key": "two", "text": "world"}]}
+    )
+    result = parse_oci_response(
+        SimpleNamespace(headers={}, data={"documents": [], "errors": []}),
+        tool="detect_dominant_language",
+        request=request,
+        request_id="MCP",
+        client_opc_request_id="CLIENT",
+    )
+
+    assert result.status == "failed"
+    assert result.summary.succeeded == 0
+    assert result.summary.failed == 2
+    assert [error.key for error in result.errors] == ["one", "two"]
+    assert {error.code for error in result.errors} == {"UPSTREAM_MISSING_RESULT"}
+
+
 def test_oci_request_id_extraction_prefers_header() -> None:
     assert (
         extract_oci_request_id(

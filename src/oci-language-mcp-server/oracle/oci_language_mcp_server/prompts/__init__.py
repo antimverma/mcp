@@ -11,4 +11,3 @@ from importlib.resources import files
 
 def load_instructions() -> str:
     return files(__package__).joinpath("server_instructions.md").read_text(encoding="utf-8")
-

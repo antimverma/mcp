@@ -6,7 +6,6 @@
 
 from __future__ import annotations
 
-from collections import OrderedDict
 from typing import Any
 
 import oci
@@ -30,7 +29,6 @@ from .models import (
 
 _user_agent_name = __project__.split("oracle.", 1)[1].split("-server", 1)[0]
 _ADDITIONAL_UA = f"{_user_agent_name}/{__version__}"
-_MAX_CACHED_CLIENTS = 16
 
 
 class OciLanguageProvider:
@@ -38,7 +36,6 @@ class OciLanguageProvider:
 
     def __init__(self, settings: LanguageMcpSettings) -> None:
         self._settings = settings
-        self._clients: OrderedDict[tuple[str, str, str | None], Any] = OrderedDict()
 
     def detect_dominant_language(
         self, request: DetectDominantLanguageRequest, *, compartment_id: str, opc_request_id: str
@@ -155,10 +152,6 @@ class OciLanguageProvider:
 
     def _client(self, *, region: str | None) -> Any:
         auth = build_auth_context(self._settings, region=region)
-        cache_key = (auth.mode, auth.region, self._settings.oci_service_endpoint)
-        if auth.mode != "session" and cache_key in self._clients:
-            self._clients.move_to_end(cache_key)
-            return self._clients[cache_key]
         config = {
             **auth.config,
             "additional_user_agent": _ADDITIONAL_UA,
@@ -174,13 +167,7 @@ class OciLanguageProvider:
         }
         if self._settings.oci_service_endpoint:
             kwargs["service_endpoint"] = self._settings.oci_service_endpoint
-        client = oci.ai_language.AIServiceLanguageClient(**kwargs)
-        if auth.mode != "session":
-            self._clients[cache_key] = client
-            self._clients.move_to_end(cache_key)
-            if len(self._clients) > _MAX_CACHED_CLIENTS:
-                self._clients.popitem(last=False)
-        return client
+        return oci.ai_language.AIServiceLanguageClient(**kwargs)
 
     @staticmethod
     def _masking(request: DetectPiiEntitiesRequest) -> dict[str, Any] | None:

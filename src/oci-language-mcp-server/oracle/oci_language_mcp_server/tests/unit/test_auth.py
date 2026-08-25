@@ -48,9 +48,8 @@ def test_auth_uses_shared_context_for_each_supported_mode(
         )
     )
 
-    assert context.mode == mode
     assert context.signer is signer
-    assert context.region == resolved_region
+    assert context.config["region"] == resolved_region
     assert options_seen[-1].auth_type is expected_type
     assert options_seen[-1].config_file == "/tmp/language-oci-config"
     assert options_seen[-1].profile_name == "LANG"
@@ -72,7 +71,6 @@ def test_auth_allows_service_endpoint_without_resolved_region(monkeypatch) -> No
         )
     )
 
-    assert context.region == "endpoint-override"
     assert context.config == {}
 
 
@@ -98,7 +96,7 @@ def test_auth_request_region_overrides_configured_region(monkeypatch) -> None:
         region="us-ashburn-1",
     )
 
-    assert context.region == "us-ashburn-1"
+    assert context.config["region"] == "us-ashburn-1"
     assert options_seen[-1].region == "us-ashburn-1"
 
 

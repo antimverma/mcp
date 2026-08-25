@@ -85,14 +85,6 @@ def parse_oci_response(
             for document in request.documents
             if document.key not in returned_keys
         )
-    if not documents and not errors and submitted:
-        errors = [
-            DocumentError(
-                code="UPSTREAM_UNAVAILABLE",
-                message=f"{_CAPABILITY_NAMES[tool]} returned no document results.",
-                retryable=True,
-            )
-        ]
     status = "partial" if documents and errors else "failed" if errors else "succeeded"
     items_found = sum(_item_count(tool, document) for document in documents)
     summary = ResultSummary(

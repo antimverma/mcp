@@ -223,19 +223,3 @@ def test_provider_sets_safe_client_configuration_for_each_auth_mode(
     output = capsys.readouterr()
     assert sentinel_payload not in output.out + output.err
     assert sentinel_authorization not in output.out + output.err
-
-
-def test_provider_bounds_cached_non_session_clients(monkeypatch) -> None:
-    monkeypatch.setattr(
-        "oracle.oci_language_mcp_server.provider.build_auth_context",
-        lambda *_args, region, **_kwargs: SimpleNamespace(
-            mode="resource_principal", region=region, config={"region": region}, signer=None
-        ),
-    )
-    monkeypatch.setattr(oci.ai_language, "AIServiceLanguageClient", lambda **_kwargs: object())
-    provider = OciLanguageProvider(LanguageMcpSettings())
-
-    for index in range(17):
-        provider._client(region=f"us-test-{index}")
-
-    assert len(provider._clients) == 16
